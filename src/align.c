@@ -90,8 +90,6 @@ static int name_cmp(const void *v1, const void *v2)
 static Cloud **split_cloud(SAMRecord **records, const size_t n_records, Cloud *clouds, size_t *n_split_clouds)
 {
 #define K 5
-#define MAX_CLOUDS 100000
-#define MAX_MMAPS  100000
 
 	struct multimapped_read {
 		size_t idx;  // index in records
@@ -124,7 +122,6 @@ static Cloud **split_cloud(SAMRecord **records, const size_t n_records, Cloud *c
 		size_t n = j-i;
 
 		if (n > 1) {
-			assert(n <= MAX_MMAPS);
 			mmaps[n_mmaps].idx = i;
 			mmaps[n_mmaps].n = n;
 
@@ -139,7 +136,7 @@ static Cloud **split_cloud(SAMRecord **records, const size_t n_records, Cloud *c
 		i = j;
 	}
 
-	assert(1 < n_clouds && n_clouds <= MAX_CLOUDS);
+	assert(n_clouds > 1);
 
 	/* bail-out if too many splits
 	     --or--
@@ -359,8 +356,6 @@ static Cloud **split_cloud(SAMRecord **records, const size_t n_records, Cloud *c
 	return cloud_assignments;
 
 #undef K
-#undef MAX_CLOUDS
-#undef MAX_MMAPS
 }
 
 static void normalize_cloud_probabilities(Cloud *clouds, const size_t nc)
