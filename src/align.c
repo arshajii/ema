@@ -97,7 +97,7 @@ static Cloud **split_cloud(SAMRecord **records, const size_t n_records, Cloud *c
 	} mmaps[MAX_CLOUDS_PER_BC];
 	size_t n_mmaps = 0;
 
-	Cloud **cloud_assignments = calloc(n_records, sizeof(*cloud_assignments));
+	Cloud **cloud_assignments = safe_calloc(n_records, sizeof(*cloud_assignments));
 
 #if DEBUG
 	int found_target_read = 0;
@@ -162,7 +162,7 @@ static Cloud **split_cloud(SAMRecord **records, const size_t n_records, Cloud *c
 	*n_split_clouds = n_clouds;
 
 	/* match up most likely mates */
-	SAMRecord **mate_map = calloc(n_records, sizeof(*mate_map));
+	SAMRecord **mate_map = safe_calloc(n_records, sizeof(*mate_map));
 	for (size_t i = 0; i < n_records; i++) {
 		if (mate_map[i] != NULL)
 			continue;
@@ -202,10 +202,10 @@ static Cloud **split_cloud(SAMRecord **records, const size_t n_records, Cloud *c
 #endif
 
 	const size_t n_clouds_2 = n_clouds*n_clouds;
-	struct mmap_dist *mmap_dists = malloc(n_clouds_2 * sizeof(*mmap_dists));
-	struct mmap_dist **mmap_dist_buf = malloc(n_clouds_2 * sizeof(*mmap_dist_buf));
-	char *mmap_rec_cache = malloc(n_clouds);
-	char *mmap_cloud_cache = malloc(n_clouds);
+	struct mmap_dist *mmap_dists = safe_malloc(n_clouds_2 * sizeof(*mmap_dists));
+	struct mmap_dist **mmap_dist_buf = safe_malloc(n_clouds_2 * sizeof(*mmap_dist_buf));
+	char *mmap_rec_cache = safe_malloc(n_clouds);
+	char *mmap_cloud_cache = safe_malloc(n_clouds);
 
 	/* initialize clouds */
 	for (size_t i = 0; i < n_clouds; i++) {
@@ -390,7 +390,7 @@ void find_clouds_and_align(SAMRecord *records, const size_t n_records, const cha
 	//records = remove_dups(records, &num_records);
 
 	size_t nc = 0;
-	Cloud *clouds = malloc(MAX_CLOUDS_PER_BC * sizeof(*clouds));
+	Cloud *clouds = safe_malloc(MAX_CLOUDS_PER_BC * sizeof(*clouds));
 	SAMDict *sd = sam_dict_new();
 	SAMRecord *record = &records[0];
 
@@ -436,7 +436,7 @@ void find_clouds_and_align(SAMRecord *records, const size_t n_records, const cha
 			}
 
 			if (collision_detected) {
-				SAMRecord **cloud_to_split = malloc(cov * sizeof(*cloud_to_split));
+				SAMRecord **cloud_to_split = safe_malloc(cov * sizeof(*cloud_to_split));
 
 				for (size_t i = 0; i < cov; i++) {
 					cloud_to_split[i] = &record[i];

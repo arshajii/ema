@@ -4,11 +4,12 @@
 #include <ctype.h>
 #include <assert.h>
 #include "samrecord.h"
+#include "util.h"
 #include "samdict.h"
 
 static SAMDictEnt *sde_new(SAMRecord *key, Cloud *v)
 {
-	SAMDictEnt *sde = malloc(sizeof(*sde));
+	SAMDictEnt *sde = safe_malloc(sizeof(*sde));
 	sde->key = key;
 	sde->mate = NULL;
 	sde->cand_records[0] = key;
@@ -20,7 +21,7 @@ static SAMDictEnt *sde_new(SAMRecord *key, Cloud *v)
 
 SAMDict *sam_dict_new(void)
 {
-	SAMDict *sd = malloc(sizeof(*sd));
+	SAMDict *sd = safe_malloc(sizeof(*sd));
 	sam_dict_clear(sd);
 	return sd;
 }

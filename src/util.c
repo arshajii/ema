@@ -96,3 +96,17 @@ void normalize_log_probs(double *p, const size_t n)
 #undef EPSILON
 }
 
+void *safe_malloc(const size_t n)
+{
+	void *p = malloc(n);
+	assert(n == 0 || p != NULL);
+	return p;
+}
+
+void *safe_calloc(size_t num, size_t size)
+{
+	void *p = calloc(num, size);
+	assert(p != NULL || num == 0 || size == 0);
+	return p;
+}
+

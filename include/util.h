@@ -26,5 +26,8 @@ uint32_t hash_ident(const char *ident);
 
 void normalize_log_probs(double *p, const size_t n);
 
+void *safe_malloc(const size_t n);
+void *safe_calloc(size_t num, size_t size);
+
 #endif /* UTIL_H */
 

@@ -81,7 +81,7 @@ int is_dup(SAMRecord *r1, SAMRecord *r2)
 SAMRecord *remove_dups(SAMRecord *records, size_t *n_records_ptr)
 {
 	const size_t n_records = *n_records_ptr;
-	SAMRecord *records_no_dups = malloc((n_records+1) * sizeof(*records_no_dups));
+	SAMRecord *records_no_dups = safe_malloc((n_records+1) * sizeof(*records_no_dups));
 	size_t n_records_no_dups = 0;
 	size_t i = 0;
 

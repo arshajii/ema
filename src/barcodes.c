@@ -31,7 +31,7 @@ void wl_read(BarcodeDict *bcdict, const char *whitelist_path)
 	const size_t n_lines = count_lines(wl_file);
 	size_t wl_size = 0;
 
-	BarcodeInfo *whitelist = malloc(n_lines * sizeof(*whitelist));
+	BarcodeInfo *whitelist = safe_malloc(n_lines * sizeof(*whitelist));
 
 	while (fgets(buf, sizeof(buf), wl_file)) {
 		if (strchr(buf, '#'))
@@ -44,7 +44,7 @@ void wl_read(BarcodeDict *bcdict, const char *whitelist_path)
 
 	qsort(whitelist, wl_size, sizeof(*whitelist), bcinfo_cmp);
 
-	uint32_t *wl_jumpgate = malloc(POW_2_24 * sizeof(*wl_jumpgate));
+	uint32_t *wl_jumpgate = safe_malloc(POW_2_24 * sizeof(*wl_jumpgate));
 
 	wl_jumpgate[0] = 0;
 	uint32_t last_hi = 0;
