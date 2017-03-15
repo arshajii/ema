@@ -21,7 +21,7 @@ const char *chrom_lookup(const chrom_t chrom)
 chrom_t chrom_index(const char *chrom)
 {
 	size_t len = 0;
-	while (chrom[len] != '_' && !isspace(chrom[len]) && chrom[len] != '\0')
+	while (!isspace(chrom[len]) && chrom[len] != '\0')
 		++len;
 
 	for (size_t i = 0; chroms[i].chrom_name[0] != '\0'; i++) {
