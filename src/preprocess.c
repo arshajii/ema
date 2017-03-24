@@ -10,13 +10,10 @@
 #include "util.h"
 #include "preprocess.h"
 
-/*
- * This is essentially a translation of Long Ranger's barcode correction scheme.
- */
-
-#define PREPROC_EXT ".preproc.fastq"
-#define NO_BC_EXT   ".no_bc.fastq"
-#define ILLUMINA_QUAL_OFFSET 33
+#define PREPROC_EXT                   ".preproc.fastq"
+#define NO_BC_EXT                     ".no_bc.fastq"
+#define INTERLEAVED_PREPROC_EXT(mate) ("_" mate PREPROC_EXT)
+#define INTERLEAVED_NO_BC_EXT(mate)   ("_" mate NO_BC_EXT)
 
 static void trim_after_space(char *s)
 {
@@ -40,8 +37,13 @@ static FILE *open_fastq_with_ext(char *fq, const char *s)
 	return fopen(fq, "w");
 }
 
+/*
+ * This is essentially a translation of Long Ranger's barcode correction scheme.
+ */
 static int correct_barcode(char *barcode, char *barcode_qual, BarcodeDict *wl)
 {
+#define ILLUMINA_QUAL_OFFSET 33
+
 	uint8_t quals[BC_LEN];
 
 	int n_count = 0;
@@ -175,6 +177,8 @@ static int correct_barcode(char *barcode, char *barcode_qual, BarcodeDict *wl)
 	}
 
 	return 0;
+
+#undef ILLUMINA_QUAL_OFFSET
 }
 
 void preprocess_fastqs(const char *fq1, const char *fq2, const char *wl_path)
@@ -191,32 +195,40 @@ void preprocess_fastqs(const char *fq1, const char *fq2, const char *wl_path)
 	if (fq1_file == NULL)
 		IOERROR(fq1);
 
-	FILE *fq2_file = fopen(fq2, "r");
+	FILE *fq2_file;
 
-	if (fq2_file == NULL) {
-		IOERROR(fq2);
+	const int interleaved = (strcmp(fq1, fq2) == 0);
+
+	if (!interleaved) {
+		fq2_file = fopen(fq2, "r");
+
+		if (fq2_file == NULL) {
+			IOERROR(fq2);
+		}
+	} else {
+		fq2_file = fq1_file;
 	}
 
 	strcpy(namebuf, fq1);
-	FILE *fq1_preproc_file = open_fastq_with_ext(namebuf, PREPROC_EXT);
+	FILE *fq1_preproc_file = open_fastq_with_ext(namebuf, interleaved ? INTERLEAVED_PREPROC_EXT("1") : PREPROC_EXT);
 	if (fq1_preproc_file == NULL) {
 		IOERROR(namebuf);
 	}
 
 	strcpy(namebuf, fq1);
-	FILE *fq1_nobc_file = open_fastq_with_ext(namebuf, NO_BC_EXT);
+	FILE *fq1_nobc_file = open_fastq_with_ext(namebuf, interleaved ? INTERLEAVED_NO_BC_EXT("1") : NO_BC_EXT);
 	if (fq1_nobc_file == NULL) {
 		IOERROR(namebuf);
 	}
 
 	strcpy(namebuf, fq2);
-	FILE *fq2_preproc_file = open_fastq_with_ext(namebuf, PREPROC_EXT);
+	FILE *fq2_preproc_file = open_fastq_with_ext(namebuf, interleaved ? INTERLEAVED_PREPROC_EXT("2") : PREPROC_EXT);
 	if (fq2_preproc_file == NULL) {
 		IOERROR(namebuf);
 	}
 
 	strcpy(namebuf, fq2);
-	FILE *fq2_nobc_file = open_fastq_with_ext(namebuf, NO_BC_EXT);
+	FILE *fq2_nobc_file = open_fastq_with_ext(namebuf, interleaved ? INTERLEAVED_NO_BC_EXT("1") : NO_BC_EXT);
 	if (fq2_nobc_file == NULL) {
 		IOERROR(namebuf);
 	}
@@ -256,6 +268,13 @@ void preprocess_fastqs(const char *fq1, const char *fq2, const char *wl_path)
 		if (barcode[0] != '\0') {
 			const bc_t bc = encode_bc(barcode);
 			wl_increment(&wl, bc);
+		}
+
+		if (interleaved) {
+			assert(fgets(id1, BUF_SIZE, fq2_file));
+			assert(fgets(read1, BUF_SIZE, fq2_file));
+			assert(fgets(sep1, BUF_SIZE, fq2_file));
+			assert(fgets(qual1, BUF_SIZE, fq2_file));
 		}
 	}
 
@@ -306,7 +325,7 @@ void preprocess_fastqs(const char *fq1, const char *fq2, const char *wl_path)
 		memmove(read1, &read1[BC_LEN + MATE1_TRIM], read1_len - (BC_LEN + MATE1_TRIM) + 1);
 		memmove(qual1, &qual1[BC_LEN + MATE1_TRIM], qual1_len - (BC_LEN + MATE1_TRIM) + 1);
 
-		int good_barcode = correct_barcode(barcode, barcode_qual, &wl);
+		const int good_barcode = correct_barcode(barcode, barcode_qual, &wl);
 		FILE *dest1 = good_barcode ? fq1_preproc_file : fq1_nobc_file;
 		FILE *dest2 = good_barcode ? fq2_preproc_file : fq2_nobc_file;
 
