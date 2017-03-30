@@ -278,7 +278,8 @@ void preprocess_fastqs(const char *fq1, const char *fq2, const char *wl_path, co
 	FILE *out_buckets_2[MAX_BUCKETS];
 
 	for (int i = 0; i < n_buckets; i++) {
-		struct stat st = {0};
+		static const struct stat EMPTY_STAT;
+		struct stat st = EMPTY_STAT;
 		char full_path[BUF_SIZE];
 		char dir[32];
 		sprintf(dir, BUCKET_DIR_PREFIX "%03d", i);
