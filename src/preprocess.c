@@ -5,6 +5,11 @@
 #include <math.h>
 #include <ctype.h>
 #include <assert.h>
+
+#include <unistd.h>
+#include <sys/types.h>
+#include <sys/stat.h>
+
 #include "align.h"
 #include "barcodes.h"
 #include "util.h"
@@ -181,23 +186,76 @@ static int correct_barcode(char *barcode, char *barcode_qual, BarcodeDict *wl)
 #undef ILLUMINA_QUAL_OFFSET
 }
 
-void preprocess_fastqs(const char *fq1, const char *fq2, const char *wl_path)
+void count_barcodes(BarcodeDict *bcdict, FILE *fq, const int interleaved)
 {
 #define BUF_SIZE 1024
+
+	char barcode[BC_LEN+1];
+	char id1[BUF_SIZE];
+	char read1[BUF_SIZE];
+	char sep1[BUF_SIZE];
+	char qual1[BUF_SIZE];
+	barcode[BC_LEN] = '\0';
+
+	while (fgets(id1, BUF_SIZE, fq)) {
+		assert(fgets(read1, BUF_SIZE, fq));
+		assert(fgets(sep1, BUF_SIZE, fq));
+		assert(fgets(qual1, BUF_SIZE, fq));
+
+		for (size_t i = 0; i < BC_LEN; i++) {
+			if (IS_ACGT(read1[i])) {
+				barcode[i] = read1[i];
+			} else {
+				barcode[0] = '\0';
+				break;
+			}
+		}
+
+		if (barcode[0] != '\0') {
+			const bc_t bc = encode_bc(barcode);
+			wl_increment(bcdict, bc);
+		}
+
+		if (interleaved) {
+			assert(fgets(id1, BUF_SIZE, fq));
+			assert(fgets(read1, BUF_SIZE, fq));
+			assert(fgets(sep1, BUF_SIZE, fq));
+			assert(fgets(qual1, BUF_SIZE, fq));
+		}
+	}
+
+#undef BUF_SIZE
+}
+
+void preprocess_fastqs(const char *fq1, const char *fq2, const char *wl_path, const int n_buckets, const char *counts)
+{
+#define BUF_SIZE 1024
+#define MAX_BUCKETS 256
+#define BUCKET_DIR_PREFIX "bucket"
+#define DEFAULT_FASTQ_NAME "ema_preproc_out.fastq"
+
+	assert(n_buckets < MAX_BUCKETS);
+	assert(!(wl_path == NULL && counts == NULL));
 
 	char namebuf[BUF_SIZE];
 
 	assert(strlen(fq1) < (sizeof(namebuf) - strlen(PREPROC_EXT) - strlen(NO_BC_EXT) - 1));
 	assert(strlen(fq2) < (sizeof(namebuf) - strlen(PREPROC_EXT) - strlen(NO_BC_EXT) - 1));
 
-	FILE *fq1_file = fopen(fq1, "r");
+	const int read_from_stdin = (strcmp(fq1, "-") == 0);
+
+	if (read_from_stdin) {
+		assert(fq2 == NULL || strcmp(fq2, "-") == 0);
+	}
+
+	FILE *fq1_file = read_from_stdin ? stdin : fopen(fq1, "r");
 
 	if (fq1_file == NULL)
 		IOERROR(fq1);
 
 	FILE *fq2_file;
 
-	const int interleaved = (strcmp(fq1, fq2) == 0);
+	const int interleaved = (read_from_stdin || (strcmp(fq1, fq2) == 0));
 
 	if (!interleaved) {
 		fq2_file = fopen(fq2, "r");
@@ -209,10 +267,42 @@ void preprocess_fastqs(const char *fq1, const char *fq2, const char *wl_path)
 		fq2_file = fq1_file;
 	}
 
-	strcpy(namebuf, fq1);
-	FILE *fq1_preproc_file = open_fastq_with_ext(namebuf, interleaved ? INTERLEAVED_PREPROC_EXT("1") : PREPROC_EXT);
-	if (fq1_preproc_file == NULL) {
-		IOERROR(namebuf);
+	/* pick some reasonable file names if reading from stdin */
+	if (read_from_stdin) {
+		fq1 = DEFAULT_FASTQ_NAME;
+		fq2 = DEFAULT_FASTQ_NAME;
+	}
+
+	/* make bucket directories */
+	FILE *out_buckets_1[MAX_BUCKETS];
+	FILE *out_buckets_2[MAX_BUCKETS];
+
+	for (int i = 0; i < n_buckets; i++) {
+		struct stat st = {0};
+		char full_path[BUF_SIZE];
+		char dir[32];
+		sprintf(dir, BUCKET_DIR_PREFIX "%03d", i);
+
+		if (stat(dir, &st) == -1) {
+			assert(mkdir(dir, S_IRWXU | S_IRWXG | S_IROTH | S_IXOTH) == 0);
+		}
+
+		strcpy(namebuf, fq1);
+		sprintf(full_path, "%s/%s", dir, namebuf);
+		FILE *fq1_preproc_file = open_fastq_with_ext(full_path, interleaved ? INTERLEAVED_PREPROC_EXT("1") : PREPROC_EXT);
+		if (fq1_preproc_file == NULL) {
+			IOERROR(full_path);
+		}
+
+		strcpy(namebuf, fq2);
+		sprintf(full_path, "%s/%s", dir, namebuf);
+		FILE *fq2_preproc_file = open_fastq_with_ext(full_path, interleaved ? INTERLEAVED_PREPROC_EXT("2") : PREPROC_EXT);
+		if (fq2_preproc_file == NULL) {
+			IOERROR(full_path);
+		}
+
+		out_buckets_1[i] = fq1_preproc_file;
+		out_buckets_2[i] = fq2_preproc_file;
 	}
 
 	strcpy(namebuf, fq1);
@@ -222,19 +312,12 @@ void preprocess_fastqs(const char *fq1, const char *fq2, const char *wl_path)
 	}
 
 	strcpy(namebuf, fq2);
-	FILE *fq2_preproc_file = open_fastq_with_ext(namebuf, interleaved ? INTERLEAVED_PREPROC_EXT("2") : PREPROC_EXT);
-	if (fq2_preproc_file == NULL) {
-		IOERROR(namebuf);
-	}
-
-	strcpy(namebuf, fq2);
-	FILE *fq2_nobc_file = open_fastq_with_ext(namebuf, interleaved ? INTERLEAVED_NO_BC_EXT("1") : NO_BC_EXT);
+	FILE *fq2_nobc_file = open_fastq_with_ext(namebuf, interleaved ? INTERLEAVED_NO_BC_EXT("2") : NO_BC_EXT);
 	if (fq2_nobc_file == NULL) {
 		IOERROR(namebuf);
 	}
 
 	BarcodeDict wl;
-	wl_read(&wl, wl_path);
 
 	char barcode[BC_LEN+1];
 	char barcode_qual[BC_LEN+1];
@@ -251,35 +334,21 @@ void preprocess_fastqs(const char *fq1, const char *fq2, const char *wl_path)
 	barcode_qual[BC_LEN] = '\0';
 
 	/* perform initial barcode counting */
-	while (fgets(id1, BUF_SIZE, fq1_file)) {
-		assert(fgets(read1, BUF_SIZE, fq1_file));
-		assert(fgets(sep1, BUF_SIZE, fq1_file));
-		assert(fgets(qual1, BUF_SIZE, fq1_file));
+	if (counts == NULL) {
+		wl_read(&wl, wl_path);
+		count_barcodes(&wl, fq1_file, interleaved);
+		rewind(fq1_file);
+	} else {
+		FILE *counts_file = fopen(counts, "rb");
 
-		for (size_t i = 0; i < BC_LEN; i++) {
-			if (IS_ACGT(read1[i])) {
-				barcode[i] = read1[i];
-			} else {
-				barcode[0] = '\0';
-				break;
-			}
-		}
+		if (counts_file == NULL)
+			IOERROR(counts);
 
-		if (barcode[0] != '\0') {
-			const bc_t bc = encode_bc(barcode);
-			wl_increment(&wl, bc);
-		}
-
-		if (interleaved) {
-			assert(fgets(id1, BUF_SIZE, fq2_file));
-			assert(fgets(read1, BUF_SIZE, fq2_file));
-			assert(fgets(sep1, BUF_SIZE, fq2_file));
-			assert(fgets(qual1, BUF_SIZE, fq2_file));
-		}
+		wl_deserialize(&wl, counts_file);
+		fclose(counts_file);
 	}
 
 	wl_compute_priors(&wl);
-	rewind(fq1_file);
 
 	while (fgets(id1, BUF_SIZE, fq1_file)) {
 		assert(fgets(read1, BUF_SIZE, fq1_file));
@@ -326,8 +395,22 @@ void preprocess_fastqs(const char *fq1, const char *fq2, const char *wl_path)
 		memmove(qual1, &qual1[BC_LEN + MATE1_TRIM], qual1_len - (BC_LEN + MATE1_TRIM) + 1);
 
 		const int good_barcode = correct_barcode(barcode, barcode_qual, &wl);
-		FILE *dest1 = good_barcode ? fq1_preproc_file : fq1_nobc_file;
-		FILE *dest2 = good_barcode ? fq2_preproc_file : fq2_nobc_file;
+
+		FILE *dest1;
+		FILE *dest2;
+
+		if (good_barcode) {
+			const bc_t bc_corrected = encode_bc(barcode);
+			BarcodeInfo *bcinfo = wl_lookup(&wl, bc_corrected);
+			assert(bcinfo != NULL);
+			const int bucket = wl_get_bucket(&wl, bcinfo, n_buckets);
+
+			dest1 = out_buckets_1[bucket];
+			dest2 = out_buckets_2[bucket];
+		} else {
+			dest1 = fq1_nobc_file;
+			dest2 = fq2_nobc_file;
+		}
 
 		fputs(id1, dest1);
 		fputs(id2, dest2);
@@ -356,11 +439,18 @@ void preprocess_fastqs(const char *fq1, const char *fq2, const char *wl_path)
 	wl_dealloc(&wl);
 	fclose(fq1_file);
 	fclose(fq2_file);
-	fclose(fq1_preproc_file);
-	fclose(fq2_preproc_file);
+
+	for (int i = 0; i < n_buckets; i++) {
+		fclose(out_buckets_1[i]);
+		fclose(out_buckets_2[i]);
+	}
+
 	fclose(fq1_nobc_file);
 	fclose(fq2_nobc_file);
 
 #undef BUF_SIZE
+#undef MAX_BUCKETS
+#undef BUCKET_DIR_PREFIX
+#undef DEFAULT_FASTQ_NAME
 }
 

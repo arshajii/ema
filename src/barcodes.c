@@ -42,6 +42,8 @@ void wl_read(BarcodeDict *bcdict, const char *whitelist_path)
 		++wl_size;
 	}
 
+	fclose(wl_file);
+
 	qsort(whitelist, wl_size, sizeof(*whitelist), bcinfo_cmp);
 
 	uint32_t *wl_jumpgate = safe_malloc(POW_2_24 * sizeof(*wl_jumpgate));
@@ -132,5 +134,50 @@ void wl_compute_priors(BarcodeDict *bcdict)
 	for (size_t i = 0; i < size; i++) {
 		whitelist[i].prior = (whitelist[i].count + 1.0)/total;
 	}
+}
+
+int wl_get_bucket(BarcodeDict *bcdict, BarcodeInfo *bc, const int n_buckets)
+{
+	return ((bc - bcdict->entries)*n_buckets)/(bcdict->size);
+}
+
+void wl_serialize(BarcodeDict *bcdict, FILE *out)
+{
+	uint32_t *jumpgate = bcdict->jumpgate;
+	BarcodeInfo *entries = bcdict->entries;
+	const size_t size = bcdict->size;
+
+	for (size_t i = 0; i < POW_2_24; i++) {
+		serialize_uint32(out, jumpgate[i]);
+	}
+
+	serialize_uint64(out, size);
+
+	for (size_t i = 0; i < size; i++) {
+		serialize_uint32(out, entries[i].bc);
+		serialize_uint32(out, entries[i].count);
+	}
+}
+
+void wl_deserialize(BarcodeDict *bcdict, FILE *in)
+{
+	uint32_t *jumpgate = safe_malloc(POW_2_24 * sizeof(*jumpgate));
+
+	for (size_t i = 0; i < POW_2_24; i++) {
+		jumpgate[i] = read_uint32(in);
+	}
+
+	const size_t size = read_uint64(in);
+	BarcodeInfo *entries = safe_malloc(size * sizeof(*entries));
+
+	for (size_t i = 0; i < size; i++) {
+		entries[i].bc = read_uint32(in);
+		entries[i].count = read_uint32(in);
+	}
+
+	bcdict->jumpgate = jumpgate;
+	bcdict->entries = entries;
+	bcdict->size = size;
+	bcdict->unfound = 0;
 }
 

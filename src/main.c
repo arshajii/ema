@@ -7,6 +7,7 @@
 #include <getopt.h>
 #include "samrecord.h"
 #include "align.h"
+#include "barcodes.h"
 #include "preprocess.h"
 #include "main.h"
 
@@ -81,8 +82,16 @@ static void print_help_and_exit(const char *argv0, int error)
 	P("\n");
 	P("preproc: preprocess barcoded FASTQ files\n");
 	P("  -1 <fastq1 path>: specify first FASTQ file [required]\n");
-	P("  -2 <fastq2 path>: specify second FASTQ file [required]\n");
+	P("  -2 <fastq2 path>: specify second FASTQ file [none]\n");
 	P("  -w <whitelist path>: specify whitelist [required]\n");
+	P("  -n <num buckets>: number of barcode buckets to make [20]\n");
+	P("  -c <counts file>: specify preexisting barcode counts [none]\n");
+	P("\n");
+	P("count: performs preliminary barcode count\n");
+	P("  -1 <fastq1 path>: specify first FASTQ file [required]\n");
+	P("  -w <whitelist path>: specify whitelist [required]\n");
+	P("  -i: indicates FASTQ is interleaved\n");
+	P("  -o <output file>: specify output file [stdout]\n");
 	P("\n");
 	P("align: choose best alignments based on barcodes\n");
 	P("  -s <SAM file>: multi-mappings in SAM format [required]\n");
@@ -113,9 +122,11 @@ int main(const int argc, char *argv[])
 		char *fq1 = NULL;
 		char *fq2 = NULL;
 		char *wl = NULL;
+		int n = 20;
+		char *counts = NULL;
 		char c;
 
-		while ((c = getopt(argc, argv, "w:1:2:")) != -1) {
+		while ((c = getopt(argc, argv, "w:1:2:n:c:")) != -1) {
 			switch (c) {
 			case '1':
 				fq1 = strdup(optarg);
@@ -126,13 +137,67 @@ int main(const int argc, char *argv[])
 			case 'w':
 				wl = strdup(optarg);
 				break;
+			case 'n':
+				n = atoi(optarg);
+				break;
+			case 'c':
+				counts = strdup(optarg);
+				break;
 			default:
 				print_help_and_exit(argv0, 1);
 			}
 		}
 
-		if (fq1 == NULL || fq2 == NULL) {
-			fprintf(stderr, "error: specify paired-end FASTQs with -1 and -2\n");
+		if (fq1 == NULL) {
+			fprintf(stderr, "error: specify paired-end FASTQs with -1 and -2 or interleaved FASTQ with -1\n");
+			exit(EXIT_FAILURE);
+		}
+
+		if (fq2 == NULL)
+			fq2 = fq1;
+
+		if (EQ(fq1, "-") ^ EQ(fq2, "-")) {
+			fprintf(stderr, "error: can only read interleaved FASTQ over stdin\n");
+			exit(EXIT_FAILURE);
+		}
+
+		if (wl == NULL && counts == NULL) {
+			fprintf(stderr, "error: specify barcode whitelist with -w OR specify barcode counts file with -c\n");
+			exit(EXIT_FAILURE);
+		}
+
+		preprocess_fastqs(fq1, fq2, wl, n, counts);
+		return EXIT_SUCCESS;
+	}
+
+	if (EQ(mode, "count")) {
+		char *fq1 = NULL;
+		char *wl = NULL;
+		int interleaved = 0;
+		char *out = NULL;
+		char c;
+
+		while ((c = getopt(argc, argv, "1:w:io:")) != -1) {
+			switch (c) {
+			case '1':
+				fq1 = strdup(optarg);
+				break;
+			case 'w':
+				wl = strdup(optarg);
+				break;
+			case 'i':
+				interleaved = 1;
+				break;
+			case 'o':
+				out = strdup(optarg);
+				break;
+			default:
+				print_help_and_exit(argv0, 1);
+			}
+		}
+
+		if (fq1 == NULL) {
+			fprintf(stderr, "error: specify first FASTQs with -1\n");
 			exit(EXIT_FAILURE);
 		}
 
@@ -141,7 +206,32 @@ int main(const int argc, char *argv[])
 			exit(EXIT_FAILURE);
 		}
 
-		preprocess_fastqs(fq1, fq2, wl);
+		const int read_from_stdin = EQ(fq1, "-");
+		FILE *fq1_file = read_from_stdin ? stdin : fopen(fq1, "r");
+
+		if (!read_from_stdin && fq1_file == NULL) {
+			IOERROR(fq1);
+		}
+
+		FILE *out_file = (out != NULL) ? fopen(out, "wb") : stdout;
+
+		if (out != NULL && out_file == NULL) {
+			IOERROR(out);
+		}
+
+		BarcodeDict wldict;
+		wl_read(&wldict, wl);
+		count_barcodes(&wldict, fq1_file, interleaved);
+		wl_serialize(&wldict, out_file);
+
+		if (!read_from_stdin)
+			fclose(fq1_file);
+
+		if (out != NULL)
+			fclose(out_file);
+
+		wl_dealloc(&wldict);
+
 		return EXIT_SUCCESS;
 	}
 

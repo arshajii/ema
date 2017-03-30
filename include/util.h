@@ -29,5 +29,12 @@ void normalize_log_probs(double *p, const size_t n);
 void *safe_malloc(const size_t n);
 void *safe_calloc(size_t num, size_t size);
 
+void serialize_uint64(FILE *out, const uint64_t x);
+void serialize_uint32(FILE *out, const uint32_t x);
+void serialize_uint8(FILE *out, const uint8_t x);
+uint64_t read_uint64(FILE *in);
+uint32_t read_uint32(FILE *in);
+uint8_t read_uint8(FILE *in);
+
 #endif /* UTIL_H */
 

@@ -28,6 +28,10 @@ void wl_dealloc(BarcodeDict *bcdict);
 BarcodeInfo *wl_lookup(BarcodeDict *bcdict, bc_t key);
 int wl_increment(BarcodeDict *bcdict, bc_t key);
 void wl_compute_priors(BarcodeDict *bcdict);
+int wl_get_bucket(BarcodeDict *bcdict, BarcodeInfo *bc, const int n_buckets);
+
+void wl_serialize(BarcodeDict *bcdict, FILE *out);
+void wl_deserialize(BarcodeDict *bcdict, FILE *in);
 
 #endif /* BARCODES_H */
 

@@ -12,8 +12,16 @@ usage: ./ema <preproc|align|help> [options]
 
 preproc: preprocess barcoded FASTQ files
   -1 <fastq1 path>: specify first FASTQ file [required]
-  -2 <fastq2 path>: specify second FASTQ file [required]
+  -2 <fastq2 path>: specify second FASTQ file [none]
   -w <whitelist path>: specify whitelist [required]
+  -n <num buckets>: number of barcode buckets to make [20]
+  -c <counts file>: specify preexisting barcode counts [none]
+
+count: performs preliminary barcode count
+  -1 <fastq1 path>: specify first FASTQ file [required]
+  -w <whitelist path>: specify whitelist [required]
+  -i: indicates FASTQ is interleaved
+  -o <output file>: specify output file [stdout]
 
 align: choose best alignments based on barcodes
   -s <SAM file>: multi-mappings in SAM format [required]
