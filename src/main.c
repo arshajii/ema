@@ -9,6 +9,7 @@
 #include "align.h"
 #include "barcodes.h"
 #include "preprocess.h"
+#include "util.h"
 #include "main.h"
 
 #define MAX_CHROM_NAME_LEN 64
@@ -40,7 +41,7 @@ SAMRecord *read_sam(FILE *sam_file, size_t *num_records)
 	char buf[1024];
 
 	const size_t lines = count_lines(sam_file);
-	SAMRecord *records = malloc((lines + 5) * sizeof(*records));
+	SAMRecord *records = safe_malloc((lines + 5) * sizeof(*records));
 	size_t num_records_actual = 0;
 
 	while (fgets(buf, sizeof(buf), sam_file)) {
@@ -60,7 +61,7 @@ SAMRecord *read_sam(FILE *sam_file, size_t *num_records)
 void read_fai(FILE *fai_file)
 {
 	const size_t lines = count_lines(fai_file);
-	chroms = malloc(lines * sizeof(*chroms));
+	chroms = safe_malloc(lines * sizeof(*chroms));
 	size_t i = 0;
 
 	while (fgets(chroms[i].chrom_name, MAX_CHROM_NAME_LEN, fai_file)) {
