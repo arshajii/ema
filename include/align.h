@@ -3,17 +3,14 @@
 
 #include <stdlib.h>
 #include <stdint.h>
-#include "samrecord.h"
+#include <stdio.h>
 
-void find_clouds_and_align(SAMRecord *records, const size_t n_records, const char *out);
+void find_clouds_and_align(FILE *fq1, FILE *fq2, const char *ref_path, FILE *out, const char *rg);
 
 typedef struct cloud {
 	uint32_t lo;
 	uint32_t hi;
 	uint32_t cov;
-
-	int snvs;
-	int indels;
 
 	double exp_cov;
 	double reads_prob;
@@ -36,21 +33,17 @@ typedef struct cloud {
 #define MATE1_LEN  (READ_LEN - BC_LEN - MATE1_TRIM)
 #define MATE2_LEN  READ_LEN
 
-/* fragment properties */
-#define MEAN_FRAG_LEN  1e5
-#define MEAN_FRAG_COV  300.0
-#define FRAG_COV_SCALE 20.0
-
 /* read properties */
 #define INSERT_AVG 250
-#define INSERT_MIN 15
-#define INSERT_MAX 500
-#define INSERT_CAP 1500
-#define UNPAIRED_PENALTY (-60.0)
-#define LONG_INS_PENALTY (-15.0)
+#define INSERT_MIN (-35)
+#define INSERT_MAX 750
+#define UNPAIRED_PENALTY (-3.0)
 
 #define ERROR_RATE 0.001
 #define INDEL_RATE 0.0001
+#define CLIP_RATE  0.01
+
+#define EXTRA_SEARCH_DEPTH 7
 
 #endif /* ALIGN_H */
 

@@ -3,6 +3,7 @@
 #include <string.h>
 #include <math.h>
 #include <ctype.h>
+#include <assert.h>
 #include "main.h"
 #include "align.h"
 #include "util.h"
@@ -10,21 +11,23 @@
 
 uint32_t record_hash(SAMRecord *record)
 {
-	if (record->hash != 0)
+	if (record->hashed)
 		return record->hash;
 
-	const uint32_t hash = hash_ident(record->ident)*record->mate;
+	const uint32_t hash = hash_ident(record->ident)*(record->mate + 1);
 	record->hash = hash;
+	record->hashed = 1;
 	return hash;
 }
 
 uint32_t record_hash_mate(SAMRecord *record)
 {
-	if (record->mate_hash != 0)
+	if (record->mate_hashed)
 		return record->mate_hash;
 
-	const uint32_t hash = hash_ident(record->ident) * ((record->mate == 1) ? 2 : 1);
+	const uint32_t hash = hash_ident(record->ident)*(2 - record->mate);
 	record->mate_hash = hash;
+	record->mate_hashed = 1;
 	return hash;
 }
 
@@ -100,112 +103,158 @@ SAMRecord *remove_dups(SAMRecord *records, size_t *n_records_ptr)
 	return records_no_dups;
 }
 
-static double score_cigar(char *cigar, int *snvs, int *indels);
-
-int parse_sam_record(char *record, SAMRecord *out)
+// from BWA source
+static inline int get_rlen(int n_cigar, const uint32_t *cigar)
 {
-	char *split_buf[64];
-	split_line(record, split_buf);
-
-	if (split_buf[2][0] == '*' || split_buf[3][0] == '0' || split_buf[5][0] == '*') {
-		return 0;
+	int k, l;
+	for (k = l = 0; k < n_cigar; k++) {
+		int op = cigar[k] & 0xf;
+		if (op == 0 || op == 2)
+			l += (cigar[k] >> 4);
 	}
-
-	/* find barcode */
-	char *bc_str = split_buf[1];
-	while (*bc_str != ':') --bc_str;
-
-	const bc_t bc = encode_bc(bc_str + 1);
-
-	const int flags = atoi(split_buf[1]);
-
-	if (flags & SAM_READ_IS_A_DUP)
-		return 0;
-
-	const uint8_t chrom = chrom_index(split_buf[2]);
-	const uint32_t pos = atol(split_buf[3]);
-
-	out->bc = bc;
-	out->chrom = chrom;
-	out->pos = pos;
-
-	size_t i = 0;
-	for (char *c = record; c != bc_str; c++) {
-		out->ident[i++] = *c;
-	}
-	out->ident[i] = '\0';
-
-	out->score = score_cigar(split_buf[5], &out->snvs, &out->indels);
-
-	size_t rlen = 0;
-	while (!isspace(split_buf[9][++rlen]));
-	out->mate = ((rlen == MATE1_LEN) ? 1 : 2);
-	out->hash = 0;
-	out->mate_hash = 0;
-	out->rev = ((flags & SAM_READ_REVERSED) != 0);
-
-	return 1;
+	return l;
 }
 
-double LOG_MATCH_SCORE;
-double LOG_MISMATCH_SCORE;
-double LOG_INDEL_SCORE;
-
-static double score_cigar(char *cigar, int *snvs, int *indels)
+static inline char rc(const char c)
 {
-	static int init = 0;
-
-	if (!init) {
-		LOG_MATCH_SCORE = log(1 - ERROR_RATE);
-		LOG_MISMATCH_SCORE = log(ERROR_RATE);
-		LOG_INDEL_SCORE = log(INDEL_RATE);
-		init = 1;
+	switch (c) {
+	case 'A':
+		return 'T';
+	case 'C':
+		return 'G';
+	case 'G':
+		return 'C';
+	case 'T':
+		return 'A';
+	case 'N':
+		return 'N';
 	}
 
-	char *p = &cigar[0];
-	double score = 0;
+	assert(0);
+}
 
-	int snvs_ = 0;
-	int indels_ = 0;
+void print_sam_record(SAMRecord *rec, SAMRecord *mate, double gamma, FILE *out, const char *rg_id)
+{
+	assert((rec != NULL || mate != NULL) && !isnan(gamma));
+	int flag = SAM_READ_PAIRED;
+	char *ident;
+	char *chrom = "*";
+	uint32_t pos = 0;
+	int mapq = 255;
+	int read_len;
+	bc_t bc;
+	SingleReadAlignment *r = NULL;
+	FASTQRecord *fq;
 
-	while (isdigit(*p)) {
-		const int n = atoi(p);
-		while (isdigit(*++p));
-		const char code = *p++;
+	if (rec != NULL) {
+		ident = rec->ident;
+		chrom = chrom_lookup(rec->chrom);
+		pos = rec->pos;
+		read_len = (rec->mate == 0 ? MATE1_LEN : MATE2_LEN);
+		bc = rec->bc;
+		r = &rec->aln;
+		fq = rec->fq;
 
-		switch (code) {
-		case 'M':
-			fprintf(stderr, "error: ambiguous cigar character: M\n");
-			goto fail;
-		case '=':
-			score += n*LOG_MATCH_SCORE;
-			break;
-		case 'X':
-		case 'S':
-			score += n*LOG_MISMATCH_SCORE;
-			snvs_ += n;
-			break;
-		case 'I':
-		case 'N':
-		case 'D':
-			score += n*LOG_INDEL_SCORE;
-			indels_ += n;
-			break;
-		default:
-			fprintf(stderr, "error: invalid cigar character: %c\n", code);
-			goto fail;
+		const double gamma_phred = -10.0*log(1.0 - gamma);
+		mapq = (gamma_phred > 253.0) ? 254 : (int)round(gamma_phred);
+
+		if (rec->rev)
+			flag |= SAM_READ_REVERSED;
+
+		flag |= ((rec->mate == 0) ? SAM_1ST_IN_PAIR : SAM_2ND_IN_PAIR);
+	} else {
+		ident = mate->ident;
+		read_len = (mate->mate == 0 ? MATE2_LEN : MATE1_LEN);
+		bc = mate->bc;
+		fq = mate->fq_mate;
+		flag |= SAM_READ_UNMAPPED;
+		flag |= ((mate->mate == 0) ? SAM_2ND_IN_PAIR : SAM_1ST_IN_PAIR);
+	}
+
+	if (mate != NULL) {
+		flag |= SAM_READ_PROPER;
+
+		if (mate->rev)
+			flag |= SAM_MATE_REVERSED;
+	} else {
+		flag |= SAM_MATE_UNMAPPED;
+	}
+
+	// basics
+	fprintf(out, "%s\t%d\t%s\t%u\t%d\t", ident, flag, chrom, pos, mapq);
+
+	// cigar
+	if (rec != NULL) {
+		const uint32_t *cigar = r->cigar;
+		const int cigar_len = r->n_cigar;
+		for (int i = 0; i < cigar_len; i++) {
+			const uint32_t op   = cigar[i];
+			const uint32_t type = op & 0xf;
+			const uint32_t n    = op >> 4;
+			fprintf(out, "%u%c", n, "MIDSS"[type]);  // note: convert hard to soft clipping
+		}
+	} else {
+		fputc('*', out);
+	}
+
+	// mate mapping
+	if (mate != NULL) {
+		const int same_chrom = (rec != NULL) && (mate->chrom == rec->chrom);
+		fprintf(out, "\t%s\t%d", same_chrom ? "=" : chrom_lookup(mate->chrom), mate->pos);
+
+		SingleReadAlignment *s = &mate->aln;
+		if (same_chrom) {
+			int64_t p0 = r->pos + (r->rev ? get_rlen(r->n_cigar, r->cigar) - 1 : 0);
+			int64_t p1 = s->pos + (s->rev ? get_rlen(s->n_cigar, s->cigar) - 1 : 0);
+			if (s->n_cigar == 0 || r->n_cigar == 0)
+				fprintf(out, "\t0");
+			else
+				fprintf(out, "\t%lld", (-(p0 - p1 + (p0 > p1 ? 1 : p0 < p1 ? -1 : 0))));
+		} else {
+			fprintf(out, "\t0");
+		}
+	} else {
+		fprintf(out, "\t*\t0\t0");
+	}
+
+	// seq and qual
+	fputc('\t', out);
+	if (rec != NULL && rec->rev) {
+		for (int i = read_len - 1; i >= 0; i--) {
+			fputc(rc(fq->read[i]), out);
+		}
+
+		fputc('\t', out);
+
+		for (int i = read_len - 1; i >= 0; i--) {
+			fputc(fq->qual[i], out);
+		}
+	} else {
+		for (int i = 0; i < read_len; i++) {
+			fputc(fq->read[i], out);
+		}
+
+		fputc('\t', out);
+
+		for (int i = 0; i < read_len; i++) {
+			fputc(fq->qual[i], out);
 		}
 	}
 
-	if (snvs != NULL)
-		*snvs = snvs_;
+	// tags
+	char bc_str[BC_LEN + 1] = {0};
+	decode_bc(bc, bc_str);
+	if (rec != NULL) {
+		fprintf(out, "\tNM:i:%d\tBX:Z:%s-1\tXG:f:%.5g", r->edit_dist, bc_str, gamma);
+	} else {
+		fprintf(out, "\tBX:Z:%s-1", bc_str);
+	}
 
-	if (indels != NULL)
-		*indels = indels_;
-
-	return score;
-
-	fail:
-	exit(EXIT_FAILURE);
+	if (rg_id != NULL) {
+		fprintf(out, "\tRG:Z:");
+		for (size_t i = 0; rg_id[i] != '\0' && !isspace(rg_id[i]); i++)
+			fputc(rg_id[i], out);
+	}
+	fputc('\n', out);
 }
 

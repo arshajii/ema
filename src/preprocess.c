@@ -20,16 +20,6 @@
 #define INTERLEAVED_PREPROC_EXT(mate) ("_" mate PREPROC_EXT)
 #define INTERLEAVED_NO_BC_EXT(mate)   ("_" mate NO_BC_EXT)
 
-static void trim_after_space(char *s)
-{
-	for (size_t i = 0; s[i] != '\0'; i++) {
-		if (isspace(s[i])) {
-			s[i] = '\0';
-			break;
-		}
-	}
-}
-
 static FILE *open_fastq_with_ext(char *fq, const char *s)
 {
 	char *ext = strrchr(fq, '.');
@@ -454,4 +444,142 @@ void preprocess_fastqs(const char *fq1, const char *fq2, const char *wl_path, co
 #undef BUCKET_DIR_PREFIX
 #undef DEFAULT_FASTQ_NAME
 }
+
+#define MAX_ID_LEN 100
+
+struct fastq_record_pe {
+	char id1[MAX_ID_LEN+2];
+	char read1[MATE1_LEN+2];
+	char qual1[MATE1_LEN+2];
+
+	char id2[MAX_ID_LEN+2];
+	char read2[MATE2_LEN+2];
+	char qual2[MATE2_LEN+2];
+
+	bc_t bc;
+};
+
+static void fastq_record_pe_init(struct fastq_record_pe *read)
+{
+	read->id1[MAX_ID_LEN+1] = '\0';
+	read->read1[MATE1_LEN+1] = '\0';
+	read->qual1[MATE1_LEN+1] = '\0';
+	read->id2[MAX_ID_LEN+1] = '\0';
+	read->read2[MATE2_LEN+1] = '\0';
+	read->qual2[MATE2_LEN+1] = '\0';
+}
+
+static void fastq_record_pe_assert(struct fastq_record_pe *read)
+{
+	assert(read->id1[MAX_ID_LEN+1]  == '\0' &&
+	       read->read1[MATE1_LEN+1] == '\0' &&
+	       read->qual1[MATE1_LEN+1] == '\0' &&
+	       read->id2[MAX_ID_LEN+1]  == '\0' &&
+	       read->read2[MATE2_LEN+1] == '\0' &&
+	       read->qual2[MATE2_LEN+1] == '\0');
+}
+
+static int fastq_record_pe_cmp(const void *v1, const void *v2)
+{
+	const bc_t bc1 = (*((struct fastq_record_pe **)v1))->bc;
+	const bc_t bc2 = (*((struct fastq_record_pe **)v2))->bc;
+	return (bc1 > bc2) - (bc1 < bc2);
+}
+
+/* sorting function should only be used on _preprocessed_ FASTQs */
+
+void sort_fastq(const char *fq1, const char *fq2)
+{
+#define BUF_SIZE 1024
+
+	char id1[BUF_SIZE];
+	char read1[BUF_SIZE];
+	char sep1[BUF_SIZE];
+	char qual1[BUF_SIZE];
+	char id2[BUF_SIZE];
+	char read2[BUF_SIZE];
+	char sep2[BUF_SIZE];
+	char qual2[BUF_SIZE];
+
+	FILE *fq1_file = fopen(fq1, "r");
+
+	if (fq1_file == NULL)
+		IOERROR(fq1);
+
+	FILE *fq2_file = fopen(fq2, "r");
+
+	if (fq2_file == NULL)
+		IOERROR(fq2);
+
+	size_t n_reads = count_lines(fq1_file)/4 + 1;
+	struct fastq_record_pe **reads = safe_malloc(n_reads * sizeof(*reads));
+	n_reads = 0;
+
+	while (fgets(id1, BUF_SIZE, fq1_file)) {
+		assert(fgets(read1, BUF_SIZE, fq1_file));
+		assert(fgets(sep1, BUF_SIZE, fq1_file));
+		assert(fgets(qual1, BUF_SIZE, fq1_file));
+
+		assert(fgets(id2, BUF_SIZE, fq2_file));
+		assert(fgets(read2, BUF_SIZE, fq2_file));
+		assert(fgets(sep2, BUF_SIZE, fq2_file));
+		assert(fgets(qual2, BUF_SIZE, fq2_file));
+
+		struct fastq_record_pe *read = safe_malloc(sizeof(*read));
+		fastq_record_pe_init(read);
+		strncpy(read->id1,   id1,   MAX_ID_LEN+1);
+		strncpy(read->read1, read1, MATE1_LEN+1);
+		strncpy(read->qual1, qual1, MATE1_LEN+1);
+		strncpy(read->id2,   id2,   MAX_ID_LEN+1);
+		strncpy(read->read2, read2, MATE2_LEN+1);
+		strncpy(read->qual2, qual2, MATE2_LEN+1);
+		fastq_record_pe_assert(read);
+
+		const char *bc_ptr = strrchr(id1, ':');
+		assert(bc_ptr != NULL);
+		const bc_t bc = encode_bc(&bc_ptr[1]);
+		read->bc = bc;
+
+		reads[n_reads++] = read;
+	}
+
+	fclose(fq1_file);
+	fclose(fq2_file);
+
+	qsort(reads, n_reads, sizeof(*reads), fastq_record_pe_cmp);
+
+	fq1_file = fopen(fq1, "w");
+
+	if (fq1_file == NULL)
+		IOERROR(fq1);
+
+	fq2_file = fopen(fq2, "w");
+
+	if (fq2_file == NULL)
+		IOERROR(fq2);
+
+	for (size_t i = 0; i < n_reads; i++) {
+		struct fastq_record_pe *read = reads[i];
+
+		fputs(read->id1, fq1_file);
+		fputs(read->read1, fq1_file);
+		fputs("+\n", fq1_file);
+		fputs(read->qual1, fq1_file);
+
+		fputs(read->id2, fq2_file);
+		fputs(read->read2, fq2_file);
+		fputs("+\n", fq2_file);
+		fputs(read->qual2, fq2_file);
+
+		free(read);
+	}
+
+	free(reads);
+	fclose(fq1_file);
+	fclose(fq2_file);
+
+#undef BUF_SIZE
+}
+
+#undef MAX_ID_LEN
 

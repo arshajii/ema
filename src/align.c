@@ -8,17 +8,17 @@
 #include "preprocess.h"
 #include "samdict.h"
 #include "samrecord.h"
+#include "bwabridge.h"
 #include "main.h"
 #include "align.h"
 
+// mate 1 is reversed
 static double mate_dist_penalty(const int64_t mate1_pos, const int64_t mate2_pos)
 {
-	int64_t d = llabs(mate1_pos - mate2_pos);
+	const int64_t d = mate1_pos - mate2_pos;
 
 	if (INSERT_MIN <= d && d <= INSERT_MAX) {
 		return 0.0;
-	} else if (d <= INSERT_CAP) {
-		return LONG_INS_PENALTY;
 	} else {
 		return UNPAIRED_PENALTY;
 	}
@@ -29,8 +29,6 @@ static void init_cloud(Cloud *c)
 	c->lo = 0;
 	c->hi = 0;
 	c->cov = 0;
-	c->snvs = 0;
-	c->indels = 0;
 	c->exp_cov = 0.0;
 	c->parent = NULL;
 	c->child = NULL;
@@ -75,8 +73,8 @@ static int name_cmp(const void *v1, const void *v2)
 {
 	SAMRecord **r1 = (SAMRecord **)v1;
 	SAMRecord **r2 = (SAMRecord **)v2;
-	uint8_t m1 = (*r1)->mate;
-	uint8_t m2 = (*r2)->mate;
+	uint32_t m1 = (*r1)->mate;
+	uint32_t m2 = (*r2)->mate;
 
 	const int cmp1 = (m1 > m2) - (m1 < m2);
 
@@ -174,12 +172,12 @@ static Cloud **split_cloud(SAMRecord **records, const size_t n_records, Cloud *c
 
 		for (size_t j = 0; j < n_records; j++) {
 			SAMRecord *rec2 = records[j];
-			if (strcmp(rec->ident, rec2->ident) == 0 && rec->mate != rec2->mate) {
+			if (strcmp(rec->ident, rec2->ident) == 0 && rec->mate != rec2->mate && rec->rev != rec2->rev) {
 				int64_t p1 = rec->pos;
 				int64_t p2 = rec2->pos;
 				int64_t dist = llabs(llabs(p1 - p2) - INSERT_AVG);
 
-				if (dist < closest_dist && dist < INSERT_CAP) {
+				if (dist < closest_dist && dist < INSERT_MAX) {
 					mate = rec2;
 					closest_dist = dist;
 					mate_idx = j;
@@ -340,10 +338,10 @@ static Cloud **split_cloud(SAMRecord **records, const size_t n_records, Cloud *c
 	}
 
 #if DEBUG
-	if (x) {
+	if (found_target_read) {
 		for (size_t i = 0; i < n_records; i++) {
 			SAMRecord *rec = records[i];
-			printf("%s/%d %u %f %p\n", rec->ident, rec->mate, rec->pos, rec->score, cloud_assignments[i]);
+			printf("%s/%d %u %f %p\n", rec->ident, 1+rec->mate, rec->pos, rec->score, cloud_assignments[i]);
 		}
 	}
 #endif
@@ -378,24 +376,73 @@ static void normalize_cloud_probabilities(Cloud *clouds, const size_t nc)
 	}
 }
 
-void find_clouds_and_align(SAMRecord *records, const size_t n_records, const char *out)
+static int read_fastq_rec_bc_group(FILE *in,
+                                   FASTQRecord *start,
+                                   FASTQRecord **out,
+                                   size_t *n_recs,
+                                   size_t *out_cap);
+
+static void append_alignments(bwaidx_t *ref,
+                              mem_opt_t *opts,
+                              FASTQRecord *m1,
+                              FASTQRecord *m2,
+                              SAMRecord **out,
+                              size_t *n_recs,
+                              size_t *out_cap);
+
+void find_clouds_and_align(FILE *fq1, FILE *fq2, const char *ref_path, FILE *out_file, const char *rg)
 {
-	FILE *out_file = (out == NULL ? stdout : fopen(out, "w"));
+	// BWA
+	fprintf(stderr, "BWA initialization...\n");
+	arena_init();
+	bwaidx_t *ref = load_reference(ref_path);
+	mem_opt_t *opts = mem_opt_init();
+	opts->max_occ = 3000;
 
-	if (!out_file) {
-		IOERROR(out);
+	// SAM header
+	fprintf(stderr, "Processing reads...\n");
+	fprintf(out_file, "@HD\tVN:1.3\tSO:unsorted\n");
+	for (int32_t i = 0; i < ref->bns->n_seqs; i++) {
+		fprintf(out_file, "@SQ\tSN:%s\tLN:%d\n", ref->bns->anns[i].name, ref->bns->anns[i].len);
 	}
-
-	qsort(records, n_records, sizeof(*records), record_cmp);
-	//records = remove_dups(records, &num_records);
+	if (rg != NULL)
+		fprintf(out_file, "%s\n", rg);
+	const char *rg_id = (rg != NULL) ? (strstr(rg, "ID:") + 3) : NULL;  // pre-validated
 
 	size_t nc = 0;
 	Cloud *clouds = safe_malloc(MAX_CLOUDS_PER_BC * sizeof(*clouds));
 	SAMDict *sd = sam_dict_new();
-	SAMRecord *record = &records[0];
 
-	while (record->bc != 0) {
-		const bc_t bc = record->bc;
+#define INIT_FASTQ_CAP 5000
+#define INIT_ALIGN_CAP 1000000
+	size_t n_fq1_recs = 0;
+	size_t fq1_recs_cap = INIT_FASTQ_CAP;
+	FASTQRecord *fq1_recs = safe_malloc(fq1_recs_cap * sizeof(*fq1_recs));
+
+	size_t n_fq2_recs = 0;
+	size_t fq2_recs_cap = INIT_FASTQ_CAP;
+	FASTQRecord *fq2_recs = safe_malloc(fq2_recs_cap * sizeof(*fq2_recs));
+
+	size_t n_records = 0;
+	size_t recs_cap = INIT_ALIGN_CAP;
+	SAMRecord *records = safe_malloc(recs_cap * sizeof(*records));
+
+	FASTQRecord start1;
+	FASTQRecord start2;
+	start1.id[0] = '\0';
+	start2.id[0] = '\0';
+
+	while ((read_fastq_rec_bc_group(fq1, &start1, &fq1_recs, &n_fq1_recs, &fq1_recs_cap) |
+	        read_fastq_rec_bc_group(fq2, &start2, &fq2_recs, &n_fq2_recs, &fq2_recs_cap)) == 0) {
+		const bc_t bc = fq1_recs[0].bc;
+
+		assert(n_fq1_recs == n_fq2_recs);
+		for (size_t i = 0; i < n_fq1_recs; i++) {
+			append_alignments(ref, opts, &fq1_recs[i], &fq2_recs[i], &records, &n_records, &recs_cap);
+		}
+
+		qsort(records, n_records, sizeof(*records), record_cmp);
+		SAMRecord *record = &records[0];
 
 		/* find and process clouds */
 		while (record->bc == bc) {
@@ -465,17 +512,9 @@ void find_clouds_and_align(SAMRecord *records, const size_t n_records, const cha
 
 		/* initializations */
 		for (SAMDictEnt *e = sd->head; e != NULL; e = e->link_next) {
-			SAMRecord **records = e->cand_records;
 			Cloud **clouds = e->cand_clouds;
 			double *gammas = e->gammas;
 			const size_t num_cands = e->num_cands;
-
-			for (size_t i = 0; i < num_cands; i++) {
-				Cloud *c = clouds[i];
-				c->snvs += records[i]->snvs;
-				c->indels += records[i]->indels;
-			}
-
 			normalize_log_probs(gammas, num_cands);
 
 			for (size_t i = 0; i < num_cands; i++) {
@@ -504,10 +543,10 @@ void find_clouds_and_align(SAMRecord *records, const size_t n_records, const cha
 				double *gammas = e->gammas;
 				size_t num_cands = e->num_cands;
 
-				SAMRecord **mate_records;
-				Cloud **mate_clouds;
-				double *mate_gammas;
-				size_t mate_num_cands;
+				SAMRecord **mate_records = NULL;
+				Cloud **mate_clouds = NULL;
+				double *mate_gammas = NULL;
+				size_t mate_num_cands = 0;
 
 				if (mate != NULL) {
 					mate_records = mate->cand_records;
@@ -517,17 +556,23 @@ void find_clouds_and_align(SAMRecord *records, const size_t n_records, const cha
 				}
 
 				for (size_t i = 0; i < num_cands; i++) {
+					int pair_found = 0;
 					double best_mate_score = UNPAIRED_PENALTY;
 
 					if (mate != NULL) {
 						for (size_t j = 0; j < mate_num_cands; j++) {
 							if (mate_records[j]->chrom == records[i]->chrom &&
-							    mate_clouds[j] == clouds[i]) {
-								const double mate_score =
-								  mate_dist_penalty(records[i]->pos, mate_records[j]->pos) + log(mate_gammas[j]);
+							    mate_records[j]->rev != records[i]->rev &&
+							    mate_clouds[j] == clouds[i] &&
+							    mate_gammas[j] != 0.0) {
 
-								if (mate_score > best_mate_score) {
+								const double penalty = records[i]->rev ? mate_dist_penalty(records[i]->pos, mate_records[j]->pos) :
+								                                         mate_dist_penalty(mate_records[j]->pos, records[i]->pos);
+								const double mate_score = penalty + log(mate_gammas[j]);
+
+								if (!pair_found || mate_score > best_mate_score) {
 									best_mate_score = mate_score;
+									pair_found = 1;
 								}
 							}
 						}
@@ -562,18 +607,228 @@ void find_clouds_and_align(SAMRecord *records, const size_t n_records, const cha
 		SAMDictEnt *e = sd->head;
 
 		while (e != NULL) {
-			SAMRecord *best = find_best_record(e);
-			fprintf(out_file, "%s %d %s %u\n", best->ident, best->mate, chrom_lookup(best->chrom), best->pos);
+			if (!e->visited) {
+				SAMDictEnt *m = e->mate;
+				double best_gamma = 0.0;
+				double best_gamma_mate = 0.0;
+				SAMRecord *best = find_best_record(e, &best_gamma);
+				SAMRecord *best_mate = (m != NULL) ? find_best_record(m, &best_gamma_mate) : NULL;
+
+				e->visited = 1;
+				if (m != NULL) {
+					m->visited = 1;
+					m->mate = NULL;
+				}
+
+				print_sam_record(best, best_mate, best_gamma, out_file, rg_id);
+				print_sam_record(best_mate, best, best_gamma_mate, out_file, rg_id);
+			}
+
 			SAMDictEnt *t = e;
 			e = e->link_next;
 			free(t);
 		}
 
 		nc = 0;
+		n_records = 0;
 		sam_dict_clear(sd);
+		arena_clear();
 	}
 
 	free(clouds);
 	free(sd);
+	free(records);
+	free(fq1_recs);
+	free(fq2_recs);
+	arena_destroy();
+	bwa_idx_destroy(ref);
+}
+
+static bc_t get_bc_direct(FASTQRecord *rec)
+{
+	char *bc_str = strrchr(rec->id, ':');
+	assert(bc_str != NULL);
+	*bc_str = '\0';
+	return encode_bc(&bc_str[1]);
+}
+
+static int read_fastq_rec(FILE *in, FASTQRecord *out)
+{
+	char sep[64];
+
+	if (!fgets(out->id, sizeof(out->id), in))
+		return 1;
+
+	assert(fgets(out->read, sizeof(out->read), in));
+	assert(fgets(sep, sizeof(sep), in));
+	assert(fgets(out->qual, sizeof(out->qual), in));
+
+	out->bc = get_bc_direct(out);
+	return 0;
+}
+
+static int read_fastq_rec_bc_group(FILE *in,
+                                   FASTQRecord *start,
+                                   FASTQRecord **out,
+                                   size_t *n_recs,
+                                   size_t *out_cap)
+{
+	*n_recs = 0;
+
+	if (start->id[0] == '\0' && read_fastq_rec(in, start) != 0)
+		return 1;
+
+	const bc_t bc = start->bc;
+	(*out)[(*n_recs)++] = *start;
+
+	do {
+		if (*n_recs == *out_cap) {
+			*out_cap = (*out_cap * 3)/2 + 1;
+			*out = safe_realloc(*out, *out_cap * sizeof(**out));
+		}
+
+		if (read_fastq_rec(in, &(*out)[*n_recs]) != 0) {
+			start->id[0] = '\0';
+			return 0;
+		}
+
+		if ((*out)[*n_recs].bc != bc) {
+			*start = (*out)[*n_recs];
+			return 0;
+		}
+
+		++(*n_recs);
+	} while (1);
+}
+
+static double score_alignment(SingleReadAlignment *r)
+{
+	static double LOG_MATCH_SCORE;
+	static double LOG_MISMATCH_SCORE;
+	static double LOG_INDEL_SCORE;
+	static double LOG_CLIP_SCORE;
+	static int init = 0;
+
+	if (!init) {
+		LOG_MATCH_SCORE = log(1 - ERROR_RATE);
+		LOG_MISMATCH_SCORE = log(ERROR_RATE);
+		LOG_INDEL_SCORE = log(INDEL_RATE);
+		LOG_CLIP_SCORE = log(CLIP_RATE);
+		init = 1;
+	}
+
+	int matches = 0;
+	int mismatches = 0;
+	int indels = 0;
+	int clipping = 0;
+
+	const uint32_t *cigar = r->cigar;
+	const int cigar_len = r->n_cigar;
+	for (int i = 0; i < cigar_len; i++) {
+		const uint32_t op   = cigar[i];
+		const uint32_t type = op & 0xf;
+		const uint32_t n    = op >> 4;
+
+		switch (type) {
+		case 0:  // M
+			matches += n;
+			break;
+		case 1:  // I
+		case 2:  // D
+			indels += n;
+			break;
+		case 3:  // S
+		case 4:  // H
+			clipping += n;
+			break;
+		default:
+			assert(0);
+		}
+	}
+
+	mismatches = r->edit_dist - indels;
+	matches -= mismatches;
+
+	return matches*LOG_MATCH_SCORE +
+	       mismatches*LOG_MISMATCH_SCORE +
+	       indels*LOG_INDEL_SCORE +
+	       clipping*LOG_CLIP_SCORE;
+}
+
+static void alignment_to_sam_rec(FASTQRecord *fq, FASTQRecord *fq_mate, SingleReadAlignment *r, SAMRecord *s, unsigned mate)
+{
+	s->bc = fq->bc;
+	s->chrom = chrom_index(r->chrom);
+	s->pos = r->pos + 1;
+
+	char *c = &fq->id[1];  // skip first '@'
+	size_t i;
+	for (i = 0; *c != '\n'; i++)
+		s->ident[i] = *c++;
+	s->ident[i] = '\0';
+
+	s->score = score_alignment(r);
+
+	s->hash = 0;
+	s->mate_hash = 0;
+	s->hashed = 0;
+	s->mate_hashed = 0;
+	s->mate = mate;
+	s->rev = r->rev;
+	s->fq = fq;
+	s->fq_mate = fq_mate;
+	s->aln = *r;
+}
+
+static void append_alignments(bwaidx_t *ref,
+                              mem_opt_t *opts,
+                              FASTQRecord *m1,
+                              FASTQRecord *m2,
+                              SAMRecord **out,
+                              size_t *n_recs,
+                              size_t *out_cap)
+{
+#define REALLOC_IF_NECESSARY() \
+	do { \
+		if (*n_recs + 1 == *out_cap) { \
+			*out_cap = (*out_cap * 3)/2 + 1; \
+			*out = safe_realloc(*out, *out_cap * sizeof(**out)); \
+		} \
+	} while (0)
+
+	EasyAlignmentPairs alignments = bwa_mem_mate_sw(ref, opts, m1->read, MATE1_LEN, m2->read, MATE2_LEN, 25);
+	int best_dist = -1;
+
+	for (size_t i = 0; i < alignments.len1; i++) {
+		EasyAlignment *a = &alignments.a1[i];
+		SingleReadAlignment r;
+		bwa_smith_waterman(ref, opts, m1->read, MATE1_LEN, a->chained_hit, &r);
+
+		const int dist = r.edit_dist + (MATE1_LEN - (a->read_e - a->read_s));
+		if (i == 0)
+			best_dist = dist;
+		else if (dist - best_dist > EXTRA_SEARCH_DEPTH)
+			break;
+
+		REALLOC_IF_NECESSARY();
+		alignment_to_sam_rec(m1, m2, &r, &(*out)[(*n_recs)++], 0);
+	}
+
+	for (size_t i = 0; i < alignments.len2; i++) {
+		EasyAlignment *a = &alignments.a2[i];
+		SingleReadAlignment r;
+		bwa_smith_waterman(ref, opts, m2->read, MATE2_LEN, a->chained_hit, &r);
+
+		const int dist = r.edit_dist + (MATE2_LEN - (a->read_e - a->read_s));
+		if (i == 0)
+			best_dist = dist;
+		else if (dist - best_dist > EXTRA_SEARCH_DEPTH)
+			break;
+
+		REALLOC_IF_NECESSARY();
+		alignment_to_sam_rec(m2, m1, &r, &(*out)[(*n_recs)++], 1);
+	}
+
+	(*out)[*n_recs].bc = 0;
 }
 

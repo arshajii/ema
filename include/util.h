@@ -20,14 +20,16 @@ typedef uint32_t bc_t;
 typedef uint8_t chrom_t;
 
 bc_t encode_bc(const char *bc);
+void decode_bc(bc_t bc, char *out);
 size_t count_lines(FILE *f);
-void split_line(const char *str, char **out);
+size_t trim_after_space(char *s);
 uint32_t hash_ident(const char *ident);
 
 void normalize_log_probs(double *p, const size_t n);
 
 void *safe_malloc(const size_t n);
 void *safe_calloc(size_t num, size_t size);
+void *safe_realloc(void *p, size_t n);
 
 void serialize_uint64(FILE *out, const uint64_t x);
 void serialize_uint32(FILE *out, const uint32_t x);

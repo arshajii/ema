@@ -7,7 +7,7 @@
 #include "align.h"
 
 #define MAX_CANDIDATES 5000
-#define DICT_CAP (1 << 16)
+#define SAM_DICT_CAP (1 << 16)
 
 /* internal dictionary entries */
 typedef struct sam_dict_ent {
@@ -20,12 +20,14 @@ typedef struct sam_dict_ent {
 	SAMRecord *cand_records[MAX_CANDIDATES];
 	Cloud *cand_clouds[MAX_CANDIDATES];
 	double gammas[MAX_CANDIDATES];
+
+	unsigned visited : 1;
 } SAMDictEnt;
 
 /* SAM record -to- mapping information dictionary */
 typedef struct {
 	SAMDictEnt *head;
-	SAMDictEnt *entries[DICT_CAP];
+	SAMDictEnt *entries[SAM_DICT_CAP];
 	uint32_t count;
 } SAMDict;
 
@@ -33,7 +35,7 @@ SAMDict *sam_dict_new(void);
 int sam_dict_add(SAMDict *sd, SAMRecord *k, Cloud *v, const int force);
 void sam_dict_del(SAMDict *sd, SAMRecord *k);
 void sam_dict_clear(SAMDict *sd);
-SAMRecord *find_best_record(SAMDictEnt *e);
+SAMRecord *find_best_record(SAMDictEnt *e, double *gamma);
 
 #endif /* SAMDICT_H */
 

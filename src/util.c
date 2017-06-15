@@ -28,6 +28,14 @@ bc_t encode_bc(const char *bc)
 #undef BC_ADD_BASE
 }
 
+void decode_bc(bc_t bc, char *out)
+{
+	for (int i = 0; i < 16; i++) {
+		out[i] = "ACGT"[bc & 0x3];
+		bc >>= 2;
+	}
+}
+
 size_t count_lines(FILE *f)
 {
 	size_t lines = 0;
@@ -39,16 +47,16 @@ size_t count_lines(FILE *f)
 	return lines + 1;
 }
 
-void split_line(const char *str, char **out)
+size_t trim_after_space(char *s)
 {
-	char *p = (char *)str;
-	size_t i = 0;
-	while (*p) {
-		out[i++] = p;
-		while (*p != '\t' && *p != '\n') ++p;
-		++p;
+	size_t i;
+	for (i = 0; s[i] != '\0'; i++) {
+		if (isspace(s[i])) {
+			s[i] = '\0';
+			break;
+		}
 	}
-	out[i] = NULL;
+	return i;
 }
 
 uint32_t hash_ident(const char *ident)
@@ -108,6 +116,13 @@ void *safe_calloc(size_t num, size_t size)
 	void *p = calloc(num, size);
 	assert(p != NULL || num == 0 || size == 0);
 	return p;
+}
+
+void *safe_realloc(void *p, size_t n)
+{
+	void *new_p = realloc(p, n);
+	assert(!(new_p == NULL && n > 0));
+	return new_p;
 }
 
 void serialize_uint64(FILE *out, const uint64_t x)

@@ -16,6 +16,7 @@ static SAMDictEnt *sde_new(SAMRecord *key, Cloud *v)
 	sde->cand_clouds[0] = v;
 	sde->gammas[0] = key->score;
 	sde->num_cands = 1;
+	sde->visited = 0;
 	return sde;
 }
 
@@ -28,7 +29,7 @@ SAMDict *sam_dict_new(void)
 
 static SAMDictEnt *find_for_key(SAMDict *sd, SAMRecord *k)
 {
-	const uint32_t idx = (record_hash(k) & (DICT_CAP - 1));
+	const uint32_t idx = (record_hash(k) & (SAM_DICT_CAP - 1));
 	for (SAMDictEnt *e = sd->entries[idx]; e != NULL; e = e->clash_next) {
 		if (record_eq(k, e->key)) {
 			return e;
@@ -39,7 +40,7 @@ static SAMDictEnt *find_for_key(SAMDict *sd, SAMRecord *k)
 
 static SAMDictEnt *find_mate_for_key(SAMDict *sd, SAMRecord *k)
 {
-	const uint32_t idx = (record_hash_mate(k) & (DICT_CAP - 1));
+	const uint32_t idx = (record_hash_mate(k) & (SAM_DICT_CAP - 1));
 	for (SAMDictEnt *e = sd->entries[idx]; e != NULL; e = e->clash_next) {
 		if (record_eq_mate(k, e->key)) {
 			return e;
@@ -90,7 +91,7 @@ int sam_dict_add(SAMDict *sd, SAMRecord *k, Cloud *v, const int force)
 			++(e->num_cands);
 		}
 	} else {
-		const uint32_t idx = (record_hash(k) & (DICT_CAP - 1));
+		const uint32_t idx = (record_hash(k) & (SAM_DICT_CAP - 1));
 		e = sde_new(k, v);
 		e->link_next = sd->head;
 		sd->head = e;
@@ -123,11 +124,11 @@ void sam_dict_del(SAMDict *sd, SAMRecord *k)
 void sam_dict_clear(SAMDict *sd)
 {
 	sd->head = NULL;
-	memset(sd->entries, 0, DICT_CAP*sizeof(SAMDictEnt *));
+	memset(sd->entries, 0, SAM_DICT_CAP*sizeof(SAMDictEnt *));
 	sd->count = 0;
 }
 
-SAMRecord *find_best_record(SAMDictEnt *e)
+SAMRecord *find_best_record(SAMDictEnt *e, double *gamma)
 {
 	SAMRecord **cand_records = e->cand_records;
 	double *gammas = e->gammas;
@@ -139,6 +140,7 @@ SAMRecord *find_best_record(SAMDictEnt *e)
 			best = i;
 	}
 
+	*gamma = gammas[best];
 	return cand_records[best];
 }
 
