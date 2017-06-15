@@ -7,7 +7,7 @@ EMA leverages an existing sensitive all-mapper to align barcoded short reads (su
 Requires BWA library and GNU C99 or later. Can be compiled with `make`.
 
 ### Usage
-Input FASTQs must first be preprocessed with asdasda 
+Input FASTQs must first be preprocessed with `ema preprocess` then sorted with `ema sort`. 
 
 ```
 usage: ./ema <preproc|sort|count|align|help> [options]
@@ -39,3 +39,6 @@ align: choose best alignments based on barcodes
 help: print this help message
 ```
 
+### Parallelism
+
+Parallelism can be achieved by running multiple instances of EMA for the barcode buckets produced by `ema preprocess` (both for sorting and aligning). [GNU Parallel](https://www.gnu.org/software/parallel/) is recommended for this.
