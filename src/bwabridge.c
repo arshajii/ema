@@ -27,7 +27,7 @@ typedef struct {
 	size_t cap;
 } Arena;
 
-static Arena arena;
+static Arena arena = {NULL, 0ULL, 0ULL};
 
 void arena_init(void)
 {
@@ -365,12 +365,12 @@ void interpret_single_read_alignment(bwaidx_t *ref, mem_aln_t *aln, SingleReadAl
 	res->n_cigar = aln->n_cigar;
 
 	res->alt = (fixed_flags & 0x2) >> 1;
-	res->mapq = (fixed_flags & 0x2c) >> 2;
+	res->mapq = (fixed_flags & 0x3fc) >> 2;//(fixed_flags & 0x2c) >> 2;
 	res->rev = fixed_flags & 0x1;
 	res->score = aln->score;
 	res->sub = aln->sub;
 	res->edit_dist = fixed_flags >> 10;
 	res->alt_sc = aln->alt_sc;
-	res->raw = aln;
+	//res->raw = aln;
 }
 

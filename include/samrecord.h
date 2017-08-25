@@ -21,6 +21,8 @@ typedef struct {
 
 	char ident[100];
 	double score;
+	int mapq;  // BWA MEM's mapq
+	int score_mapq;  // our own computed mapq
 
 	uint32_t hash;
 	uint32_t mate_hash;
@@ -40,8 +42,15 @@ uint32_t record_hash_mate(SAMRecord *record);
 uint32_t record_eq(SAMRecord *r1, SAMRecord *r2);
 uint32_t record_eq_mate(SAMRecord *r1, SAMRecord *r2);
 int record_cmp(const void *v1, const void *v2);
-SAMRecord *remove_dups(SAMRecord *records, size_t *n_records_ptr);
-void print_sam_record(SAMRecord *rec, SAMRecord *mate, double gamma, FILE *out, const char *rg_id);
+
+struct xa;
+void print_sam_record(SAMRecord *rec,
+                      SAMRecord *mate,
+                      double gamma,
+                      FILE *out,
+                      const char *rg_id,
+                      struct xa *alts,
+                      size_t n_alts);
 
 /* SAM specs */
 #define SAM_NUM_FIELDS 11

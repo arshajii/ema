@@ -62,31 +62,29 @@ static void print_help_and_exit(const char *argv0, int error)
 #define P(...) fprintf(out, __VA_ARGS__)
 
 	FILE *out = error ? stderr : stdout;
-	P("usage: %s <preproc|sort|count|align|help> [options]\n", argv0);
+	P("usage: %s <preproc|align|help> [options]\n", argv0);
 	P("\n");
 	P("preproc: preprocess barcoded FASTQ files\n");
-	P("  -1 <FASTQ1 path>: first FASTQ file [required]\n");
-	P("  -2 <FASTQ2 path>: second FASTQ file [none]\n");
-	P("  -w <whitelist path>: barcode whitelist [required]\n");
+	P("  -1 <fastq1 path>: specify first FASTQ file [required]\n");
+	P("  -2 <fastq2 path>: specify second FASTQ file [none]\n");
+	P("  -w <whitelist path>: specify whitelist [required]\n");
 	P("  -n <num buckets>: number of barcode buckets to make [20]\n");
-	P("  -c <counts file>: preexisting barcode counts [none]\n");
+	P("  -c <counts file>: specify preexisting barcode counts [none]\n");
 	P("\n");
 	P("sort: sort preprocessed FASTQs by barcode\n");
-	P("  -1 <FASTQ1 path>: first FASTQ file [required]\n");
-	P("  -2 <FASTQ2 path>: second FASTQ file [required]\n");
+	P("  -1 <fastq1 path>: specify first FASTQ file [required]\n");
+	P("  -2 <fastq2 path>: specify second FASTQ file [required]\n");
 	P("\n");
 	P("count: performs preliminary barcode count\n");
-	P("  -1 <FASTQ1 path>: first FASTQ file [required]\n");
-	P("  -w <whitelist path>: barcode whitelist [required]\n");
+	P("  -1 <fastq1 path>: specify first FASTQ file [required]\n");
+	P("  -w <whitelist path>: specify whitelist [required]\n");
 	P("  -i: indicates FASTQ is interleaved\n");
-	P("  -o <output file>: output file [stdout]\n");
+	P("  -o <output file>: specify output file [stdout]\n");
 	P("\n");
 	P("align: choose best alignments based on barcodes\n");
-	P("  -1 <FASTQ1 path>: first (preprocessed and sorted) FASTQ file [required]\n");
-	P("  -2 <FASTQ2 path>: second (preprocessed and sorted) FASTQ file [required]\n");
-	P("  -r <FASTA path>: indexed reference [required]\n");
+	P("  -s <SAM file>: multi-mappings in SAM format [required]\n");
+	P("  -i <fai file>: fai file for reference used in mapping [required]\n");
 	P("  -o <SAM file>: output SAM file [default: stdout]\n");
-	P("  -R <RG string>: full read group string (e.g. $'@RG\\tID:foo\\tSM:bar') [default: none]\n");
 	P("\n");
 	P("help: print this help message\n");
 	exit(error ? EXIT_FAILURE : EXIT_SUCCESS);
@@ -339,6 +337,7 @@ int main(const int argc, char *argv[])
 
 		free(fai);
 		free(chroms);
+
 		return EXIT_SUCCESS;
 	}
 

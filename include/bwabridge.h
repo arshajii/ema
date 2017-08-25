@@ -78,7 +78,7 @@ typedef struct {
 	int alt_sc;
 	//int read_s;
 	//int read_e;
-	mem_aln_t *raw;
+	//mem_aln_t *raw;
 	unsigned rev : 1;
 } SingleReadAlignment;
 

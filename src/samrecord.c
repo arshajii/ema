@@ -45,7 +45,8 @@ uint32_t record_eq_mate(SAMRecord *r1, SAMRecord *r2)
 	       strcmp(r1->ident, r2->ident) == 0;
 }
 
-int record_cmp(const void *v1, const void *v2) {
+int record_cmp(const void *v1, const void *v2)
+{
 	const SAMRecord *r1 = (SAMRecord *)v1;
 	const SAMRecord *r2 = (SAMRecord *)v2;
 
@@ -68,39 +69,6 @@ int record_cmp(const void *v1, const void *v2) {
 	if (c != 0) return c;
 
 	return strcmp(r1->ident, r2->ident);
-}
-
-int is_dup(SAMRecord *r1, SAMRecord *r2)
-{
-	return strcmp(r1->ident, r2->ident) == 0 &&
-	       r1->chrom == r2->chrom &&
-	       r1->pos == r2->pos &&
-	       r1->mate == r2->mate &&
-	       r1->rev == r2->rev &&
-	       r1->score == r2->score;
-}
-
-/* caution: frees given records buffer */
-SAMRecord *remove_dups(SAMRecord *records, size_t *n_records_ptr)
-{
-	const size_t n_records = *n_records_ptr;
-	SAMRecord *records_no_dups = safe_malloc((n_records+1) * sizeof(*records_no_dups));
-	size_t n_records_no_dups = 0;
-	size_t i = 0;
-
-	while (i < n_records) {
-		SAMRecord *rec = &records[i++];
-		records_no_dups[n_records_no_dups++] = *rec;
-
-		while (i < n_records && is_dup(rec, &records[i])) {
-			i++;
-		}
-	}
-
-	free(records);
-	*n_records_ptr = n_records_no_dups;
-	records_no_dups[n_records_no_dups].bc = 0;
-	return records_no_dups;
 }
 
 // from BWA source
@@ -133,14 +101,20 @@ static inline char rc(const char c)
 	assert(0);
 }
 
-void print_sam_record(SAMRecord *rec, SAMRecord *mate, double gamma, FILE *out, const char *rg_id)
+void print_sam_record(SAMRecord *rec,
+                      SAMRecord *mate,
+                      double gamma,
+                      FILE *out,
+                      const char *rg_id,
+                      struct xa *alts,
+                      size_t n_alts)
 {
 	assert((rec != NULL || mate != NULL) && !isnan(gamma));
 	int flag = SAM_READ_PAIRED;
 	char *ident;
 	char *chrom = "*";
 	uint32_t pos = 0;
-	int mapq = 255;
+	int mapq = 0;
 	int read_len;
 	bc_t bc;
 	SingleReadAlignment *r = NULL;
@@ -155,8 +129,14 @@ void print_sam_record(SAMRecord *rec, SAMRecord *mate, double gamma, FILE *out, 
 		r = &rec->aln;
 		fq = rec->fq;
 
-		const double gamma_phred = -10.0*log(1.0 - gamma);
-		mapq = (gamma_phred > 253.0) ? 254 : (int)round(gamma_phred);
+		// take the min of MAPQ computed three different ways (gamma, score, BWA MEM):
+		const int gamma_mapq = ((gamma <= 0.999999) ? (int)(-10*log10(1 - gamma)) : 60);
+		const int score_mapq = rec->score_mapq;
+		const int bwa_mapq   = rec->mapq;
+		mapq = MIN(gamma_mapq, score_mapq);
+		mapq = MIN(mapq, bwa_mapq);
+		mapq = MAX(mapq, 0);
+		mapq = MIN(mapq, 60);
 
 		if (rec->rev)
 			flag |= SAM_READ_REVERSED;
@@ -209,7 +189,7 @@ void print_sam_record(SAMRecord *rec, SAMRecord *mate, double gamma, FILE *out, 
 			if (s->n_cigar == 0 || r->n_cigar == 0)
 				fprintf(out, "\t0");
 			else
-				fprintf(out, "\t%lld", (-(p0 - p1 + (p0 > p1 ? 1 : p0 < p1 ? -1 : 0))));
+				fprintf(out, "\t%ld", (long)(-(p0 - p1 + (p0 > p1 ? 1 : p0 < p1 ? -1 : 0))));
 		} else {
 			fprintf(out, "\t0");
 		}
@@ -255,6 +235,25 @@ void print_sam_record(SAMRecord *rec, SAMRecord *mate, double gamma, FILE *out, 
 		for (size_t i = 0; rg_id[i] != '\0' && !isspace(rg_id[i]); i++)
 			fputc(rg_id[i], out);
 	}
+
+	if (n_alts > 0) {
+		fprintf(out, "\tXA:Z:");
+
+		for (size_t i = 0; i < n_alts; i++) {
+			struct xa *alt = &alts[i];
+			fprintf(out, "%s,%s%d,", alt->chrom, alt->rev ? "-" : "+", alt->pos);
+			const uint32_t *cigar = alt->cigar;
+			const int cigar_len = alt->cigar_len;
+			for (int i = 0; i < cigar_len; i++) {
+				const uint32_t op   = cigar[i];
+				const uint32_t type = op & 0xf;
+				const uint32_t n    = op >> 4;
+				fprintf(out, "%u%c", n, "MIDSS"[type]);  // note: convert hard to soft clipping
+			}
+			fprintf(out, ",%d;", alt->edit_dist);
+		}
+	}
+
 	fputc('\n', out);
 }
 

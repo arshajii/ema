@@ -4,6 +4,7 @@
 #include <ctype.h>
 #include <assert.h>
 #include "samrecord.h"
+#include "main.h"
 #include "util.h"
 #include "samdict.h"
 
@@ -128,19 +129,78 @@ void sam_dict_clear(SAMDict *sd)
 	sd->count = 0;
 }
 
-SAMRecord *find_best_record(SAMDictEnt *e, double *gamma)
+SAMRecord *find_best_record(SAMDictEnt *e, double *gamma, struct xa *alts, size_t *n_alts)
 {
 	SAMRecord **cand_records = e->cand_records;
 	double *gammas = e->gammas;
 	size_t best = 0;
+	double best_gamma = -1.0;
+	struct xa *alt = &alts[0];
+	*n_alts = 0;
 
 	const size_t num_cands = e->num_cands;
-	for (size_t i = 1; i < num_cands; i++) {
-		if (gammas[i] >= gammas[best])
+	for (size_t i = 0; i < num_cands;) {
+		double total_gamma = gammas[i];  // cloud splitting can lead to dup. records, so collect total prob.
+
+		size_t j;
+		for (j = i+1; j < num_cands; j++) {
+			if (cand_records[j] == cand_records[i])
+				total_gamma += gammas[j];
+			else
+				break;
+		}
+
+		if (total_gamma > best_gamma) {
 			best = i;
+			best_gamma = total_gamma;
+		}
+
+		i = j;
 	}
 
-	*gamma = gammas[best];
+	*gamma = best_gamma;
+
+	if (best_gamma <= SECONDARY_ALIGN_THRESH) {
+		size_t second_best = 0;
+		double second_best_gamma = -1.0;
+		for (size_t i = 0; i < num_cands;) {
+			double total_gamma = gammas[i];  // cloud splitting can lead to dup. records, so collect total prob.
+
+			size_t j;
+			for (j = i+1; j < num_cands; j++) {
+				if (cand_records[j] == cand_records[i])
+					total_gamma += gammas[j];
+				else
+					break;
+			}
+
+			if (i != best && total_gamma > second_best_gamma) {
+				second_best = i;
+				second_best_gamma = total_gamma;
+			}
+
+			i = j;
+		}
+
+		if (second_best_gamma > 0) {
+			SAMRecord *second_best_record = cand_records[second_best];
+			alt->chrom = chrom_lookup(second_best_record->chrom);
+			alt->pos = second_best_record->pos;
+			alt->edit_dist = second_best_record->aln.edit_dist;
+			alt->cigar_len = second_best_record->aln.n_cigar;
+			assert((size_t)(alt->cigar_len) < sizeof(alt->cigar)/sizeof(alt->cigar[0]));
+			alt->rev = second_best_record->rev;
+			memcpy(alt->cigar, second_best_record->aln.cigar, alt->cigar_len * sizeof(alt->cigar[0]));
+			++*n_alts;
+		} else {
+			alt->chrom = NULL;
+			alt->pos = 0;
+		}
+	} else {
+		alt->chrom = NULL;
+		alt->pos = 0;
+	}
+
 	return cand_records[best];
 }
 
