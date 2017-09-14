@@ -7,7 +7,7 @@ EMA leverages an existing sensitive all-mapper to align barcoded short reads (su
 Requires BWA library and GNU C99 or later. Can be compiled with `make`.
 
 ### Usage
-Input FASTQs must first be preprocessed with `ema preprocess` then sorted with `ema sort`. 
+Input FASTQs must first be preprocessed with `ema preproc` then sorted with `ema sort` (see below for more details). 
 
 ```
 usage: ./ema <preproc|sort|count|align|help> [options]
@@ -39,6 +39,21 @@ align: choose best alignments based on barcodes
 help: print this help message
 ```
 
+### Preprocessing
+
+For large data sets, preprocessing can most easily be done as follows (assuming interleaved FASTQs):
+
+```
+$ cat data/*.fastq | ema count -1 - -w /path/to/whitelist.txt -i -o counts_file
+$ cat data/*.fastq | ema preproc -1 - -w /path/to/whitelist.txt -c counts_file
+```
+
+Then the FASTQs in each bucket (except the no-barcode bucket) must be sorted with `ema sort`.
+
 ### Parallelism
 
-Parallelism can be achieved by running multiple instances of EMA for the barcode buckets produced by `ema preprocess` (both for sorting and aligning). [GNU Parallel](https://www.gnu.org/software/parallel/) is recommended for this.
+Parallelism can be achieved by running multiple instances of EMA for the barcode buckets produced by `ema preprocess` (both for sorting and aligning). A script using [GNU Parallel](https://www.gnu.org/software/parallel/) is provided in [`utils`](util/) and can be run as follows (in the same directory as the `bucket` folders):
+
+```
+$ EMAPATH=/path/to/ema/executable PICARDPATH=/path/to/picard/jar ./ema_wrapper.sh
+```

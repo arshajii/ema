@@ -222,6 +222,7 @@ void preprocess_fastqs(const char *fq1, const char *fq2, const char *wl_path, co
 #define BUF_SIZE 1024
 #define MAX_BUCKETS 256
 #define BUCKET_DIR_PREFIX "bucket"
+#define NO_BC_DIR (BUCKET_DIR_PREFIX "_no_bc")
 #define DEFAULT_FASTQ_NAME "ema_preproc_out.fastq"
 
 	assert(n_buckets < MAX_BUCKETS);
@@ -267,13 +268,15 @@ void preprocess_fastqs(const char *fq1, const char *fq2, const char *wl_path, co
 	FILE *out_buckets_1[MAX_BUCKETS];
 	FILE *out_buckets_2[MAX_BUCKETS];
 
+	static const struct stat EMPTY_STAT;
+	struct stat st;
+	char full_path[BUF_SIZE];
+
 	for (int i = 0; i < n_buckets; i++) {
-		static const struct stat EMPTY_STAT;
-		struct stat st = EMPTY_STAT;
-		char full_path[BUF_SIZE];
 		char dir[32];
 		sprintf(dir, BUCKET_DIR_PREFIX "%03d", i);
 
+		st = EMPTY_STAT;
 		if (stat(dir, &st) == -1) {
 			assert(mkdir(dir, S_IRWXU | S_IRWXG | S_IROTH | S_IXOTH) == 0);
 		}
@@ -296,14 +299,21 @@ void preprocess_fastqs(const char *fq1, const char *fq2, const char *wl_path, co
 		out_buckets_2[i] = fq2_preproc_file;
 	}
 
+	st = EMPTY_STAT;
+	if (stat(NO_BC_DIR, &st) == -1) {
+		assert(mkdir(NO_BC_DIR, S_IRWXU | S_IRWXG | S_IROTH | S_IXOTH) == 0);
+	}
+
 	strcpy(namebuf, fq1);
-	FILE *fq1_nobc_file = open_fastq_with_ext(namebuf, interleaved ? INTERLEAVED_NO_BC_EXT("1") : NO_BC_EXT);
+	sprintf(full_path, "%s/%s", NO_BC_DIR, namebuf);
+	FILE *fq1_nobc_file = open_fastq_with_ext(full_path, interleaved ? INTERLEAVED_NO_BC_EXT("1") : NO_BC_EXT);
 	if (fq1_nobc_file == NULL) {
 		IOERROR(namebuf);
 	}
 
 	strcpy(namebuf, fq2);
-	FILE *fq2_nobc_file = open_fastq_with_ext(namebuf, interleaved ? INTERLEAVED_NO_BC_EXT("2") : NO_BC_EXT);
+	sprintf(full_path, "%s/%s", NO_BC_DIR, namebuf);
+	FILE *fq2_nobc_file = open_fastq_with_ext(full_path, interleaved ? INTERLEAVED_NO_BC_EXT("2") : NO_BC_EXT);
 	if (fq2_nobc_file == NULL) {
 		IOERROR(namebuf);
 	}
