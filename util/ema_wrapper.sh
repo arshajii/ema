@@ -29,7 +29,6 @@ eval set -- "$PARSED"
 
 t=1
 
-# now enjoy the options in order and nicely split until we see --
 while true; do
     case "$1" in
         -r|--ref)
