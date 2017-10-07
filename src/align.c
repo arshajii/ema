@@ -82,6 +82,8 @@ static void append_alignments(bwaidx_t *ref,
                               size_t *n_recs,
                               size_t *out_cap);
 
+static void mark_dups(SAMRecord *records, const size_t n_records);
+
 void find_clouds_and_align(FILE *fq1, FILE *fq2, const char *ref_path, FILE *out_file, const char *rg)
 {
 	// BWA
@@ -135,6 +137,7 @@ void find_clouds_and_align(FILE *fq1, FILE *fq2, const char *ref_path, FILE *out
 		}
 
 		qsort(records, n_records, sizeof(*records), record_cmp);
+		mark_dups(records, n_records);
 		SAMRecord *record = &records[0];
 
 		/* find and process clouds */
@@ -162,6 +165,7 @@ void find_clouds_and_align(FILE *fq1, FILE *fq2, const char *ref_path, FILE *out
 					}
 
 					/* unlink the cloud with a collision */
+					/*
 					if (c->parent != NULL)
 						c->parent->child = c->child;
 
@@ -170,6 +174,7 @@ void find_clouds_and_align(FILE *fq1, FILE *fq2, const char *ref_path, FILE *out
 
 					c->child = NULL;
 					c->parent = NULL;
+					*/
 				}
 
 				++cov;
@@ -183,10 +188,15 @@ void find_clouds_and_align(FILE *fq1, FILE *fq2, const char *ref_path, FILE *out
 				}
 
 				qsort(cloud_to_split, cov, sizeof(*cloud_to_split), name_cmp);
-				size_t n_split_clouds;
-				Cloud **assignments = split_cloud_sim_anneal(cloud_to_split, cov, &clouds[nc], &n_split_clouds);
+				//size_t n_split_clouds;
+				//Cloud **assignments = split_cloud_sim_anneal(cloud_to_split, cov, &clouds[nc], &n_split_clouds);
+
+				mark_optimal_alignments_in_cloud(cloud_to_split, cov);
+				size_t n_split_clouds = 1;
 
 				for (size_t i = 0; i < cov; i++) {
+					sam_dict_add(sd, cloud_to_split[i], &clouds[nc], 1);
+					/*
 					if (assignments[i] != NULL) {
 						sam_dict_add(sd, cloud_to_split[i], assignments[i], 1);
 					} else {
@@ -194,10 +204,11 @@ void find_clouds_and_align(FILE *fq1, FILE *fq2, const char *ref_path, FILE *out
 							sam_dict_add(sd, cloud_to_split[i], &clouds[nc + j], 1);
 						}
 					}
+					*/
 				}
 
 				free(cloud_to_split);
-				free(assignments);
+				//free(assignments);
 
 				nc += n_split_clouds;
 			} else {
@@ -302,12 +313,14 @@ void find_clouds_and_align(FILE *fq1, FILE *fq2, const char *ref_path, FILE *out
 			}
 
 			for (SAMDictEnt *e = sd->head; e != NULL; e = e->link_next) {
+				SAMRecord **records = e->cand_records;
 				Cloud **clouds = e->cand_clouds;
 				double *gammas = e->gammas;
 				size_t num_cands = e->num_cands;
 
 				for (size_t i = 0; i < num_cands; i++) {
-					clouds[i]->exp_cov += gammas[i];
+					if (records[i]->active && !records[i]->duplicate)
+						clouds[i]->exp_cov += gammas[i];
 				}
 			}
 
@@ -331,8 +344,10 @@ void find_clouds_and_align(FILE *fq1, FILE *fq2, const char *ref_path, FILE *out
 				SAMDictEnt *m = e->mate;
 				double best_gamma = 0.0;
 				double best_gamma_mate = 0.0;
-				SAMRecord *best = find_best_record(e, &best_gamma, alts1, &n_alts1);
-				SAMRecord *best_mate = (m != NULL) ? find_best_record(m, &best_gamma_mate, alts2, &n_alts2) : NULL;
+				double cloud_weight1 = 0.0;
+				double cloud_weight2 = 0.0;
+				SAMRecord *best = find_best_record(e, &best_gamma, &cloud_weight1, alts1, &n_alts1);
+				SAMRecord *best_mate = (m != NULL) ? find_best_record(m, &best_gamma_mate,  &cloud_weight2, alts2, &n_alts2) : NULL;
 
 				e->visited = 1;
 				if (m != NULL) {
@@ -340,8 +355,8 @@ void find_clouds_and_align(FILE *fq1, FILE *fq2, const char *ref_path, FILE *out
 					m->mate = NULL;
 				}
 
-				print_sam_record(best, best_mate, best_gamma, out_file, rg_id, alts1, n_alts1);
-				print_sam_record(best_mate, best, best_gamma_mate, out_file, rg_id, alts2, n_alts2);
+				print_sam_record(best, best_mate, best_gamma, cloud_weight1, out_file, rg_id, alts1, n_alts1);
+				print_sam_record(best_mate, best, best_gamma_mate, cloud_weight2, out_file, rg_id, alts2, n_alts2);
 			}
 
 			SAMDictEnt *t = e;
@@ -508,6 +523,9 @@ static void alignment_to_sam_rec(FASTQRecord *fq, FASTQRecord *fq_mate, SingleRe
 	s->mate_hash = 0;
 	s->hashed = 0;
 	s->mate_hashed = 0;
+	s->unique = 0;
+	s->duplicate = 0;
+	s->active = 1;
 	s->mate = mate;
 	s->rev = r->rev;
 	s->fq = fq;
@@ -561,6 +579,8 @@ static void append_alignments(bwaidx_t *ref,
 
 	EasyAlignmentPairs alignments = bwa_mem_mate_sw(ref, opts, m1->read, MATE1_LEN, m2->read, MATE2_LEN, 25);
 	int best_dist = -1;
+	size_t aligns_added1 = 0;
+	size_t aligns_added2 = 0;
 
 	for (size_t i = 0; i < alignments.len1; i++) {
 		EasyAlignment *a = &alignments.a1[i];
@@ -581,7 +601,11 @@ static void append_alignments(bwaidx_t *ref,
 		REALLOC_IF_NECESSARY();
 		r.mapq = mem_approx_mapq_se_insist(opts, a->chained_hit);
 		alignment_to_sam_rec(m1, m2, &r, &(*out)[(*n_recs)++], 0);
+		++aligns_added1;
 	}
+
+	if (aligns_added1 == 1)
+		(*out)[*n_recs - 1].unique = 1;
 
 	for (size_t i = 0; i < alignments.len2; i++) {
 		EasyAlignment *a = &alignments.a2[i];
@@ -602,8 +626,33 @@ static void append_alignments(bwaidx_t *ref,
 		REALLOC_IF_NECESSARY();
 		r.mapq = mem_approx_mapq_se_insist(opts, a->chained_hit);
 		alignment_to_sam_rec(m2, m1, &r, &(*out)[(*n_recs)++], 1);
+		++aligns_added2;
 	}
 
+	if (aligns_added2 == 1)
+		(*out)[*n_recs - 1].unique = 1;
+
 	(*out)[*n_recs].bc = 0;
+}
+
+/* caution: `records` should be pos-sorted */
+static void mark_dups(SAMRecord *records, const size_t n_records)
+{
+	for (size_t i = 1; i < n_records; i++) {
+		SAMRecord *curr = &records[i];
+		SAMRecord *prev = &records[i-1];
+
+		if (curr->mate != prev->mate)
+			continue;
+
+		const size_t read_len = (curr->mate == 0 ? MATE1_LEN : MATE2_LEN);
+
+		if (curr->bc == prev->bc &&
+		    curr->pos == prev->pos &&
+		    memcmp(curr->fq->read, prev->fq->read, read_len) == 0)
+		{
+			curr->duplicate = 1;
+		}
+	}
 }
 

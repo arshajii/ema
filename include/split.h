@@ -5,11 +5,17 @@
 #include "samrecord.h"
 #include "align.h"
 
-#define TMAX_LOG 4.0
-#define TMIN_LOG (-11.0)
+#define TMAX_LOG 0.0
+#define TMIN_LOG (-12.0)
 #define SIM_ANNEAL_ITERS 50000
 
-Cloud **split_cloud_sim_anneal(SAMRecord **records, size_t n_records, Cloud *clouds, size_t *n_split_clouds);
+//Cloud **split_cloud_sim_anneal(SAMRecord **records, size_t n_records, Cloud *clouds, size_t *n_split_clouds);
+
+#define BIN_SIZE 1000
+#define MAX_FRAG 500000
+#define MAX_BINS (MAX_FRAG/BIN_SIZE)
+
+void mark_optimal_alignments_in_cloud(SAMRecord **records, size_t n_records);
 
 #endif /* SPLIT_H */
 

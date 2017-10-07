@@ -12,6 +12,8 @@ typedef struct cloud {
 	double exp_cov;
 	double weight;
 
+	uint32_t hi, lo;  // start+end points
+
 	/* disjoint set for probability normalization */
 	struct cloud *parent;
 	struct cloud *child;

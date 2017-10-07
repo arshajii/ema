@@ -56,6 +56,7 @@ int sam_dict_add(SAMDict *sd, SAMRecord *k, Cloud *v, const int force)
 
 	if (e != NULL) {
 		const size_t num_cands = e->num_cands;
+
 		if (num_cands < MAX_CANDIDATES) {
 			if (num_cands > 0) {
 				Cloud *parent = e->cand_clouds[num_cands - 1];
@@ -129,9 +130,10 @@ void sam_dict_clear(SAMDict *sd)
 	sd->count = 0;
 }
 
-SAMRecord *find_best_record(SAMDictEnt *e, double *gamma, struct xa *alts, size_t *n_alts)
+SAMRecord *find_best_record(SAMDictEnt *e, double *gamma, double *cloud_weight, struct xa *alts, size_t *n_alts)
 {
 	SAMRecord **cand_records = e->cand_records;
+	Cloud **cand_clouds = e->cand_clouds;
 	double *gammas = e->gammas;
 	size_t best = 0;
 	double best_gamma = -1.0;
@@ -139,47 +141,31 @@ SAMRecord *find_best_record(SAMDictEnt *e, double *gamma, struct xa *alts, size_
 	*n_alts = 0;
 
 	const size_t num_cands = e->num_cands;
-	for (size_t i = 0; i < num_cands;) {
-		double total_gamma = gammas[i];  // cloud splitting can lead to dup. records, so collect total prob.
+	for (size_t i = 0; i < num_cands; i++) {
+		if (!cand_records[i]->active)
+			continue;
 
-		size_t j;
-		for (j = i+1; j < num_cands; j++) {
-			if (cand_records[j] == cand_records[i])
-				total_gamma += gammas[j];
-			else
-				break;
-		}
-
-		if (total_gamma > best_gamma) {
+		if (gammas[i] > best_gamma) {
 			best = i;
-			best_gamma = total_gamma;
+			best_gamma = gammas[i];
 		}
-
-		i = j;
 	}
 
 	*gamma = best_gamma;
+	*cloud_weight = cand_clouds[best]->weight;
 
 	if (best_gamma <= SECONDARY_ALIGN_THRESH) {
 		size_t second_best = 0;
 		double second_best_gamma = -1.0;
-		for (size_t i = 0; i < num_cands;) {
-			double total_gamma = gammas[i];  // cloud splitting can lead to dup. records, so collect total prob.
 
-			size_t j;
-			for (j = i+1; j < num_cands; j++) {
-				if (cand_records[j] == cand_records[i])
-					total_gamma += gammas[j];
-				else
-					break;
-			}
+		for (size_t i = 0; i < num_cands; i++) {
+			if (!cand_records[i]->active)
+				continue;
 
-			if (i != best && total_gamma > second_best_gamma) {
+			if (i != best && gammas[i] > second_best_gamma) {
 				second_best = i;
-				second_best_gamma = total_gamma;
+				second_best_gamma = gammas[i];
 			}
-
-			i = j;
 		}
 
 		if (second_best_gamma > 0) {

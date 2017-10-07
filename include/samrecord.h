@@ -31,6 +31,9 @@ typedef struct {
 	uint32_t rev         : 1;
 	uint32_t hashed      : 1;
 	uint32_t mate_hashed : 1;
+	uint32_t duplicate   : 1;
+	uint32_t unique      : 1;
+	uint32_t active      : 1;
 
 	FASTQRecord *fq;
 	FASTQRecord *fq_mate;
@@ -47,6 +50,7 @@ struct xa;
 void print_sam_record(SAMRecord *rec,
                       SAMRecord *mate,
                       double gamma,
+                      double cloud_weight,
                       FILE *out,
                       const char *rg_id,
                       struct xa *alts,

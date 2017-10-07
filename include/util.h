@@ -11,6 +11,8 @@
 		exit(EXIT_FAILURE); \
 	} while (0)
 
+#define SIZE(a) (sizeof(a)/sizeof((a)[0]))
+
 #define MAX(x, y) (((x) > (y)) ? (x) : (y))
 #define MIN(x, y) (((x) < (y)) ? (x) : (y))
 
