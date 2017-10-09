@@ -82,7 +82,7 @@ static void append_alignments(bwaidx_t *ref,
                               size_t *n_recs,
                               size_t *out_cap);
 
-static void mark_dups(SAMRecord *records, const size_t n_records);
+void mark_dups(SAMRecord *records, const size_t n_records);
 
 void find_clouds_and_align(FILE *fq1, FILE *fq2, const char *ref_path, FILE *out_file, const char *rg)
 {
@@ -137,7 +137,7 @@ void find_clouds_and_align(FILE *fq1, FILE *fq2, const char *ref_path, FILE *out
 		}
 
 		qsort(records, n_records, sizeof(*records), record_cmp);
-		mark_dups(records, n_records);
+		//mark_dups(records, n_records);
 		SAMRecord *record = &records[0];
 
 		/* find and process clouds */
@@ -636,7 +636,7 @@ static void append_alignments(bwaidx_t *ref,
 }
 
 /* caution: `records` should be pos-sorted */
-static void mark_dups(SAMRecord *records, const size_t n_records)
+void mark_dups(SAMRecord *records, const size_t n_records)
 {
 	for (size_t i = 1; i < n_records; i++) {
 		SAMRecord *curr = &records[i];

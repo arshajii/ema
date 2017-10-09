@@ -375,7 +375,7 @@ static double log_density_prob(unsigned int density)
 void mark_optimal_alignments_in_cloud(SAMRecord **records, size_t n_records)
 {
 #define MAX_NO_MOVE 500
-#define BUF_SIZE    10000
+#define BUF_SIZE    30000
 
 #define BIN_FOR_POS(bins, pos, lo) ((bins)[((pos) - (lo))/BIN_SIZE])
 
@@ -413,9 +413,11 @@ void mark_optimal_alignments_in_cloud(SAMRecord **records, size_t n_records)
 	uint32_t cloud_lo = 0xffffffff;
 	uint32_t cloud_hi = 0x00000000;
 
-	assert(n_records < BUF_SIZE);
+	if (n_records >= BUF_SIZE)
+		return;
 
 	/* get rid of duplicates */
+	/*
 	SAMRecord **records_no_dups = safe_malloc(n_records * sizeof(*records_no_dups));
 	size_t n_records_no_dups = 0;
 
@@ -427,6 +429,7 @@ void mark_optimal_alignments_in_cloud(SAMRecord **records, size_t n_records)
 
 	records = records_no_dups;
 	n_records = n_records_no_dups;
+	*/
 
 	/* find the multi-mapped reads, record highest */
 	for (size_t i = 0; i < n_records;) {
@@ -452,6 +455,11 @@ void mark_optimal_alignments_in_cloud(SAMRecord **records, size_t n_records)
 
 	/* get initial configuration probability */
 	const size_t n_bins = (cloud_hi - cloud_lo)/BIN_SIZE;
+
+	if (n_bins >= MAX_BINS) {
+		//free(records);
+		return;
+	}
 
 	for (size_t i = 0; i < n_records; i++) {
 		SAMRecord *rec = records[i];
@@ -517,6 +525,6 @@ void mark_optimal_alignments_in_cloud(SAMRecord **records, size_t n_records)
 		records[mmaps[i].idx + mmaps[i].active]->active = 1;
 	}
 
-	free(records);  // recall: we reassigned `records` to a new, dup-free array
+	//free(records);  // recall: we reassigned `records` to a new, dup-free array
 }
 

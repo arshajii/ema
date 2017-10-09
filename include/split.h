@@ -12,7 +12,7 @@
 //Cloud **split_cloud_sim_anneal(SAMRecord **records, size_t n_records, Cloud *clouds, size_t *n_split_clouds);
 
 #define BIN_SIZE 1000
-#define MAX_FRAG 500000
+#define MAX_FRAG 1000000
 #define MAX_BINS (MAX_FRAG/BIN_SIZE)
 
 void mark_optimal_alignments_in_cloud(SAMRecord **records, size_t n_records);
