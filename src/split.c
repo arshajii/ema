@@ -377,7 +377,8 @@ void mark_optimal_alignments_in_cloud(SAMRecord **records, size_t n_records)
 #define MAX_NO_MOVE 500
 #define BUF_SIZE    30000
 
-#define BIN_FOR_POS(bins, pos, lo) ((bins)[((pos) - (lo))/BIN_SIZE])
+#define BIN_IDX_FOR_POS(pos, lo)   (((pos) - (lo))/BIN_SIZE)
+#define BIN_FOR_POS(bins, pos, lo) ((bins)[BIN_IDX_FOR_POS((pos), (lo))])
 
 #define UPDATE_CLOUD_BOUNDARIES(r, lo, hi) \
 	do {                                   \
@@ -454,7 +455,7 @@ void mark_optimal_alignments_in_cloud(SAMRecord **records, size_t n_records)
 	}
 
 	/* get initial configuration probability */
-	const size_t n_bins = (cloud_hi - cloud_lo)/BIN_SIZE;
+	const size_t n_bins = (cloud_hi - cloud_lo)/BIN_SIZE + 1;
 
 	if (n_bins >= MAX_BINS) {
 		//free(records);
@@ -487,8 +488,8 @@ void mark_optimal_alignments_in_cloud(SAMRecord **records, size_t n_records)
 		SAMRecord *rec_new = records[mmaps[r].idx + r_new];
 
 		// compute change in probability
-		const size_t old_bin = BIN_FOR_POS(bins, rec_old->pos, cloud_lo);
-		const size_t new_bin = BIN_FOR_POS(bins, rec_new->pos, cloud_lo);
+		const size_t old_bin = BIN_IDX_FOR_POS(rec_old->pos, cloud_lo);
+		const size_t new_bin = BIN_IDX_FOR_POS(rec_new->pos, cloud_lo);
 
 		// bear with me here...
 		const double old_bin_prob_old = log_density_prob(bins[old_bin]);
