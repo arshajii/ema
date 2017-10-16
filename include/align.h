@@ -54,7 +54,7 @@ void init_cloud(Cloud *c);
 #define CLIP_RATE  0.03
 
 #define EXTRA_SEARCH_DEPTH       12
-#define SPLIT_EXTRA_SEARCH_DEPTH 6
+#define SPLIT_EXTRA_SEARCH_DEPTH 5
 
 #define SECONDARY_ALIGN_THRESH 0.9
 #define MAX_ALTS 15

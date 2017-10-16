@@ -375,7 +375,7 @@ static double log_density_prob(unsigned int density)
 void mark_optimal_alignments_in_cloud(SAMRecord **records, size_t n_records)
 {
 #define MAX_NO_MOVE 500
-#define BUF_SIZE    30000
+#define BUF_SIZE    50000
 
 #define BIN_IDX_FOR_POS(pos, lo)   (((pos) - (lo))/BIN_SIZE)
 #define BIN_FOR_POS(bins, pos, lo) ((bins)[BIN_IDX_FOR_POS((pos), (lo))])
@@ -417,20 +417,43 @@ void mark_optimal_alignments_in_cloud(SAMRecord **records, size_t n_records)
 	if (n_records >= BUF_SIZE)
 		return;
 
-	/* get rid of duplicates */
-	/*
-	SAMRecord **records_no_dups = safe_malloc(n_records * sizeof(*records_no_dups));
-	size_t n_records_no_dups = 0;
+	/* remove records that are too far from the lowest edit distance */
+	SAMRecord **records_clean = safe_malloc(n_records * sizeof(*records_clean));
+	size_t n_records_clean = 0;
 
-	for (size_t i = 0; i < n_records; i++) {
-		SAMRecord *rec = records[i];
-		if (!rec->duplicate)
-			records_no_dups[n_records_no_dups++] = rec;
+	for (size_t i = 0; i < n_records;) {
+		size_t j = i+1;
+
+		while (j < n_records && record_eq(records[j], records[i])) {
+			++j;
+		}
+
+		const size_t n = j-i;
+
+		if (n > 1) {
+			size_t min_edit_dist = 0;
+			for (size_t k = 0; k < n; k++) {
+				if (records[i+k]->aln.edit_dist < records[i+min_edit_dist]->aln.edit_dist)
+					min_edit_dist = k;
+			}
+
+			const int edit_dist_cutoff = records[i+min_edit_dist]->aln.edit_dist + SPLIT_EXTRA_SEARCH_DEPTH;
+
+			for (size_t k = 0; k < n; k++) {
+				if (records[i+k]->aln.edit_dist <= edit_dist_cutoff)
+					records_clean[n_records_clean++] = records[i+k];
+				else
+					records[i+k]->active = 0;
+			}
+		} else {
+			records_clean[n_records_clean++] = records[i];
+		}
+
+		i = j;
 	}
 
-	records = records_no_dups;
-	n_records = n_records_no_dups;
-	*/
+	records = records_clean;
+	n_records = n_records_clean;
 
 	/* find the multi-mapped reads, record highest */
 	for (size_t i = 0; i < n_records;) {
@@ -445,20 +468,26 @@ void mark_optimal_alignments_in_cloud(SAMRecord **records, size_t n_records)
 		const size_t n = j-i;
 
 		if (n > 1) {
-			mmaps[n_mmaps++] = (struct multimapped_read){.idx = i, .n = n, .active = 0};
+			size_t max_score = 0;
+			for (size_t k = 0; k < n; k++) {
+				if (records[i+k]->score > records[i+max_score]->score)
+					max_score = k;
+			}
+
+			mmaps[n_mmaps++] = (struct multimapped_read){.idx = i, .n = n, .active = max_score};
 		} else {
 			umaps[n_umaps++] = (struct uniquemapped_read){.idx = i};
 		}
 
-		log_config_prob += records[i]->score;  // add up active alignment scores
+		//log_config_prob += records[i]->score;  // add up active alignment scores
 		i = j;
 	}
 
 	/* get initial configuration probability */
 	const size_t n_bins = (cloud_hi - cloud_lo)/BIN_SIZE + 1;
 
-	if (n_bins >= MAX_BINS) {
-		//free(records);
+	if (n_bins >= MAX_BINS || n_mmaps == 0) {
+		free(records);
 		return;
 	}
 
@@ -499,7 +528,7 @@ void mark_optimal_alignments_in_cloud(SAMRecord **records, size_t n_records)
 		const double density_prob_change = (old_bin_prob_new - old_bin_prob_old) +
 		                                   (new_bin_prob_new - new_bin_prob_old);
 
-		const double score_prob_change = rec_new->score - rec_old->score;
+		const double score_prob_change = 0;//rec_new->score - rec_old->score;
 		const double prob_change = density_prob_change + score_prob_change;
 
 		if (prob_change > 0 || exp(prob_change/t) >= ((double)rand())/RAND_MAX) {
@@ -514,8 +543,9 @@ void mark_optimal_alignments_in_cloud(SAMRecord **records, size_t n_records)
 		}
 
 		if (no_move_count >= MAX_NO_MOVE)
-			break;
+			goto exit;
 	}
+	exit:
 
 	/* set active records */
 	for (size_t i = 0; i < n_umaps; i++) {
@@ -526,6 +556,6 @@ void mark_optimal_alignments_in_cloud(SAMRecord **records, size_t n_records)
 		records[mmaps[i].idx + mmaps[i].active]->active = 1;
 	}
 
-	//free(records);  // recall: we reassigned `records` to a new, dup-free array
+	free(records);  // recall: we reassigned `records` to a new, dup-free array
 }
 
