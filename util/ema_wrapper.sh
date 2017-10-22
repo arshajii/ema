@@ -49,6 +49,7 @@ while true; do
             echo "-t  number of jobs"
             shift
             exit 0
+            ;;
         --)
             shift
             break
