@@ -17,6 +17,9 @@ typedef struct cloud {
 	/* disjoint set for probability normalization */
 	struct cloud *parent;
 	struct cloud *child;
+
+	int id;
+	unsigned bad : 1;
 } Cloud;
 
 struct xa {
@@ -29,6 +32,10 @@ struct xa {
 };
 
 void init_cloud(Cloud *c);
+
+struct sam_record;
+int is_pair(struct sam_record *r1, struct sam_record *r2);
+int is_pair_relaxed(struct sam_record *r1, struct sam_record *r2);
 
 /* reasonable clouds/barcode upper bound */
 #define MAX_CLOUDS_PER_BC 100000
@@ -55,6 +62,7 @@ void init_cloud(Cloud *c);
 
 #define EXTRA_SEARCH_DEPTH       12
 #define SPLIT_EXTRA_SEARCH_DEPTH 5
+#define SPLIT_CLIP_THRESH        15
 
 #define SECONDARY_ALIGN_THRESH 0.9
 #define MAX_ALTS 15

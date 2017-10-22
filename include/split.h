@@ -14,6 +14,7 @@
 #define BIN_SIZE 1000
 #define MAX_FRAG 1000000
 #define MAX_BINS (MAX_FRAG/BIN_SIZE)
+#define SCORE_SCALE 20
 
 void mark_optimal_alignments_in_cloud(SAMRecord **records, size_t n_records);
 

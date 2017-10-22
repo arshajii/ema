@@ -130,7 +130,7 @@ void sam_dict_clear(SAMDict *sd)
 	sd->count = 0;
 }
 
-SAMRecord *find_best_record(SAMDictEnt *e, double *gamma, double *cloud_weight, struct xa *alts, size_t *n_alts)
+SAMRecord *find_best_record(SAMDictEnt *e, double *gamma, Cloud **cloud, struct xa *alts, size_t *n_alts)
 {
 	SAMRecord **cand_records = e->cand_records;
 	Cloud **cand_clouds = e->cand_clouds;
@@ -152,7 +152,7 @@ SAMRecord *find_best_record(SAMDictEnt *e, double *gamma, double *cloud_weight, 
 	}
 
 	*gamma = best_gamma;
-	*cloud_weight = cand_clouds[best]->weight;
+	*cloud = cand_clouds[best];
 
 	if (best_gamma <= SECONDARY_ALIGN_THRESH) {
 		size_t second_best = 0;
@@ -186,6 +186,24 @@ SAMRecord *find_best_record(SAMDictEnt *e, double *gamma, double *cloud_weight, 
 		alt->chrom = NULL;
 		alt->pos = 0;
 	}
+
+	/*
+	for (size_t i = 0; i < num_cands && *n_alts < MAX_ALTS; i++) {
+		if (i == best)
+			continue;
+
+		SAMRecord *second_best_record = cand_records[i];
+		alt->chrom = chrom_lookup(second_best_record->chrom);
+		alt->pos = second_best_record->pos;
+		alt->edit_dist = second_best_record->aln.edit_dist;
+		alt->cigar_len = second_best_record->aln.n_cigar;
+		assert((size_t)(alt->cigar_len) < sizeof(alt->cigar)/sizeof(alt->cigar[0]));
+		alt->rev = second_best_record->rev;
+		memcpy(alt->cigar, second_best_record->aln.cigar, alt->cigar_len * sizeof(alt->cigar[0]));
+		++*n_alts;
+		++alt;
+	}
+	*/
 
 	return cand_records[best];
 }

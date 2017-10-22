@@ -15,10 +15,44 @@
 
 void init_cloud(Cloud *c)
 {
+	static int cloud_id = 0;
 	c->exp_cov = 0.0;
 	c->parent = NULL;
 	c->child = NULL;
+	c->id = cloud_id++;
+	c->bad = 0;
 }
+
+int is_pair(SAMRecord *r1, SAMRecord *r2)
+{
+	if (r1->rev == r2->rev || r1->chrom != r2->chrom)
+		return 0;
+
+	if (r2->rev) {
+		SAMRecord *rt = r2;
+		r2 = r1;
+		r1 = rt;
+	}
+
+	const int64_t d = r1->pos - r2->pos;
+	return INSERT_MIN <= d && d <= INSERT_MAX;
+}
+
+int is_pair_relaxed(SAMRecord *r1, SAMRecord *r2)
+{
+	if (r1->chrom != r2->chrom)
+		return 0;
+
+	if (r1->pos < r2->pos) {
+		SAMRecord *rt = r2;
+		r2 = r1;
+		r1 = rt;
+	}
+
+	const int64_t d = r1->pos - r2->pos;
+	return INSERT_MIN <= d && d <= INSERT_MAX;
+}
+
 
 // mate 1 is reversed
 static double mate_dist_penalty(const int64_t mate1_pos, const int64_t mate2_pos)
@@ -40,12 +74,10 @@ static int name_cmp(const void *v1, const void *v2)
 	uint32_t m1 = (*r1)->mate;
 	uint32_t m2 = (*r2)->mate;
 
-	const int cmp1 = (m1 > m2) - (m1 < m2);
+	const int cmp1 = strcmp((*r1)->ident, (*r2)->ident);
+	const int cmp2 = (m1 > m2) - (m1 < m2);
 
-	if (cmp1 == 0)
-		return strcmp((*r1)->ident, (*r2)->ident);
-	else
-		return cmp1;
+	return (cmp1 != 0) ? cmp1 : cmp2;
 }
 
 static void normalize_cloud_probabilities(Cloud *clouds, const size_t nc)
@@ -181,6 +213,7 @@ void find_clouds_and_align(FILE *fq1, FILE *fq2, const char *ref_path, FILE *out
 			}
 
 			if (collision_detected) {
+				c->bad = 1;
 				SAMRecord **cloud_to_split = safe_malloc(cov * sizeof(*cloud_to_split));
 
 				for (size_t i = 0; i < cov; i++) {
@@ -344,10 +377,10 @@ void find_clouds_and_align(FILE *fq1, FILE *fq2, const char *ref_path, FILE *out
 				SAMDictEnt *m = e->mate;
 				double best_gamma = 0.0;
 				double best_gamma_mate = 0.0;
-				double cloud_weight1 = 0.0;
-				double cloud_weight2 = 0.0;
-				SAMRecord *best = find_best_record(e, &best_gamma, &cloud_weight1, alts1, &n_alts1);
-				SAMRecord *best_mate = (m != NULL) ? find_best_record(m, &best_gamma_mate,  &cloud_weight2, alts2, &n_alts2) : NULL;
+				Cloud *cloud1 = NULL;
+				Cloud *cloud2 = NULL;
+				SAMRecord *best = find_best_record(e, &best_gamma, &cloud1, alts1, &n_alts1);
+				SAMRecord *best_mate = (m != NULL) ? find_best_record(m, &best_gamma_mate, &cloud2, alts2, &n_alts2) : NULL;
 
 				e->visited = 1;
 				if (m != NULL) {
@@ -355,8 +388,8 @@ void find_clouds_and_align(FILE *fq1, FILE *fq2, const char *ref_path, FILE *out
 					m->mate = NULL;
 				}
 
-				print_sam_record(best, best_mate, best_gamma, cloud_weight1, out_file, rg_id, alts1, n_alts1);
-				print_sam_record(best_mate, best, best_gamma_mate, cloud_weight2, out_file, rg_id, alts2, n_alts2);
+				print_sam_record(best, best_mate, best_gamma, cloud1, out_file, rg_id, alts1, n_alts1);
+				print_sam_record(best_mate, best, best_gamma_mate, cloud2, out_file, rg_id, alts2, n_alts2);
 			}
 
 			SAMDictEnt *t = e;
@@ -505,7 +538,7 @@ static void score_alignment(SingleReadAlignment *r, SAMRecord *s)
 	                      clipping*LOG10_CLIP_SCORE);
 }
 
-static void alignment_to_sam_rec(FASTQRecord *fq, FASTQRecord *fq_mate, SingleReadAlignment *r, SAMRecord *s, unsigned mate)
+static void alignment_to_sam_rec(FASTQRecord *fq, FASTQRecord *fq_mate, SingleReadAlignment *r, SAMRecord *s, unsigned mate, int clip, int clip_edit_dist)
 {
 	s->bc = fq->bc;
 	s->chrom = chrom_index(r->chrom);
@@ -519,6 +552,8 @@ static void alignment_to_sam_rec(FASTQRecord *fq, FASTQRecord *fq_mate, SingleRe
 
 	score_alignment(r, s);
 
+	s->clip = clip;
+	s->clip_edit_dist = clip_edit_dist;
 	s->hash = 0;
 	s->mate_hash = 0;
 	s->hashed = 0;
@@ -600,7 +635,7 @@ static void append_alignments(bwaidx_t *ref,
 
 		REALLOC_IF_NECESSARY();
 		r.mapq = mem_approx_mapq_se_insist(opts, a->chained_hit);
-		alignment_to_sam_rec(m1, m2, &r, &(*out)[(*n_recs)++], 0);
+		alignment_to_sam_rec(m1, m2, &r, &(*out)[(*n_recs)++], 0, clip, dist);
 		++aligns_added1;
 	}
 
@@ -625,7 +660,7 @@ static void append_alignments(bwaidx_t *ref,
 
 		REALLOC_IF_NECESSARY();
 		r.mapq = mem_approx_mapq_se_insist(opts, a->chained_hit);
-		alignment_to_sam_rec(m2, m1, &r, &(*out)[(*n_recs)++], 1);
+		alignment_to_sam_rec(m2, m1, &r, &(*out)[(*n_recs)++], 1, clip, dist);
 		++aligns_added2;
 	}
 
