@@ -72,23 +72,20 @@ fi
 
 echo "Aligning..."
 parallel -j "$t" --xapply "$EMAPATH align -1 {1} -2 {2} -r $r -o {1//}/$OUTSAM -R '$R'" \
-                           ::: bucket*/*1.preproc.fastq \
-                           ::: bucket*/*2.preproc.fastq
+                           ::: bucket0*/*1.preproc.fastq \
+                           ::: bucket0*/*2.preproc.fastq
 bwa mem -t "$t" -M -R "${R//$'\t'/'\t'}" "$r" bucket_no_bc/*1.no_bc.fastq bucket_no_bc/*2.no_bc.fastq > "bucket_no_bc/$OUTSAM"
 
 echo "SAM -> sorted BAM..."
 parallel -j "$t" "samtools sort -m 5G -o {//}/$OUTBAM {}" ::: bucket*/$OUTSAM
 rm bucket*/*.sam
-samtools sort -@ "$t" -m 5G -o "bucket_no_bc/$OUTBAM" "bucket_no_bc/$OUTSAM"
-rm bucket_no_bc/*.sam
 
 echo "Removing duplicates..."
 parallel -j "$t" "java -Xmx10g -jar $PICARDPATH MarkDuplicates I={} O={//}/$OUTBAM_NO_DUPS M={//}marked_dup_metrics.txt READ_ONE_BARCODE_TAG=BX READ_TWO_BARCODE_TAG=BX" ::: bucket*/$OUTBAM
 
 echo "BAM merge..."
-samtools merge -@ "$t" -f -c "$FINALBAM" bucket*/$OUTBAM_NO_DUPS "bucket_no_bc/$OUTBAM"
+samtools merge -@ "$t" -f -c "$FINALBAM" bucket*/$OUTBAM_NO_DUPS
 rm bucket*/*.bam
-rm bucket_no_bc/*.bam
 
 echo "Indexing..."
 samtools index "$FINALBAM"
