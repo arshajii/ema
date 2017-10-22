@@ -14,7 +14,7 @@ typedef struct fastq_record {
 } FASTQRecord;
 
 /* compact representation of one line in a SAM file */
-typedef struct {
+typedef struct sam_record {
 	bc_t bc;
 	chrom_t chrom;
 	uint32_t pos;
@@ -23,6 +23,8 @@ typedef struct {
 	double score;
 	int mapq;  // BWA MEM's mapq
 	int score_mapq;  // our own computed mapq
+	int clip;
+	int clip_edit_dist;  // edit distance including clipping
 
 	uint32_t hash;
 	uint32_t mate_hash;
@@ -31,6 +33,9 @@ typedef struct {
 	uint32_t rev         : 1;
 	uint32_t hashed      : 1;
 	uint32_t mate_hashed : 1;
+	uint32_t duplicate   : 1;
+	uint32_t unique      : 1;
+	uint32_t active      : 1;
 
 	FASTQRecord *fq;
 	FASTQRecord *fq_mate;
@@ -47,6 +52,7 @@ struct xa;
 void print_sam_record(SAMRecord *rec,
                       SAMRecord *mate,
                       double gamma,
+                      Cloud *cloud,
                       FILE *out,
                       const char *rg_id,
                       struct xa *alts,

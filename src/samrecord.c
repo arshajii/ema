@@ -104,6 +104,7 @@ static inline char rc(const char c)
 void print_sam_record(SAMRecord *rec,
                       SAMRecord *mate,
                       double gamma,
+                      Cloud *cloud,
                       FILE *out,
                       const char *rg_id,
                       struct xa *alts,
@@ -129,7 +130,6 @@ void print_sam_record(SAMRecord *rec,
 		r = &rec->aln;
 		fq = rec->fq;
 
-		// take the min of MAPQ computed three different ways (gamma, score, BWA MEM):
 		const int gamma_mapq = ((gamma <= 0.999999) ? (int)(-10*log10(1 - gamma)) : 60);
 		const int score_mapq = rec->score_mapq;
 		const int bwa_mapq   = rec->mapq;
@@ -225,7 +225,7 @@ void print_sam_record(SAMRecord *rec,
 	char bc_str[BC_LEN + 1] = {0};
 	decode_bc(bc, bc_str);
 	if (rec != NULL) {
-		fprintf(out, "\tNM:i:%d\tBX:Z:%s-1\tXG:f:%.5g", r->edit_dist, bc_str, gamma);
+		fprintf(out, "\tNM:i:%d\tBX:Z:%s-1\tXG:f:%.5g\tXC:i:%d\tXF:i:%d", r->edit_dist, bc_str, gamma, cloud->id, cloud->bad);
 	} else {
 		fprintf(out, "\tBX:Z:%s-1", bc_str);
 	}

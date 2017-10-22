@@ -4,9 +4,8 @@ set -o pipefail
 
 OUTSAM="ema_out.sam"
 OUTBAM="ema_out.sorted.bam"
+OUTBAM_NO_DUPS="ema_out.sorted.dupsmarked.bam"
 FINALBAM="ema_out.full.sorted.bam"
-FINALBAM_NO_DUPS="ema_out.full.sorted.dupsmarked.bam"
-OUTVCF="ema_out.vcf"
 
 SHORT=r:R:t:
 LONG=ref:,rg:,threads:
@@ -50,6 +49,7 @@ while true; do
             echo "-t  number of jobs"
             shift
             exit 0
+            ;;
         --)
             shift
             break
@@ -82,26 +82,16 @@ rm bucket*/*.sam
 samtools sort -@ "$t" -m 5G -o "bucket_no_bc/$OUTBAM" "bucket_no_bc/$OUTSAM"
 rm bucket_no_bc/*.sam
 
+echo "Removing duplicates..."
+parallel -j "$t" "java -Xmx10g -jar $PICARDPATH MarkDuplicates I={} O={//}/$OUTBAM_NO_DUPS M={//}marked_dup_metrics.txt READ_ONE_BARCODE_TAG=BX READ_TWO_BARCODE_TAG=BX" ::: bucket*/$OUTBAM
+
 echo "BAM merge..."
-samtools merge -@ "$t" -f -c "$FINALBAM" bucket*/$OUTBAM "bucket_no_bc/$OUTBAM"
+samtools merge -@ "$t" -f -c "$FINALBAM" bucket*/$OUTBAM_NO_DUPS "bucket_no_bc/$OUTBAM"
 rm bucket*/*.bam
 rm bucket_no_bc/*.bam
 
 echo "Indexing..."
 samtools index "$FINALBAM"
-
-echo "Removing duplicates..."
-java -jar "$PICARDPATH" MarkDuplicates \
-                        I="$FINALBAM" \
-                        O="$FINALBAM_NO_DUPS" \
-                        M=marked_dup_metrics.txt \
-                        READ_ONE_BARCODE_TAG=BX \
-                        READ_TWO_BARCODE_TAG=BX
-
-rm "$FINALBAM"
-
-echo "Indexing..."
-samtools index "$FINALBAM_NO_DUPS"
 
 echo "Done!"
 
