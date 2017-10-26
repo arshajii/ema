@@ -5,8 +5,7 @@
 #include <stdint.h>
 #include <stdio.h>
 
-//void find_clouds_and_align(SAMRecord *records, const size_t n_records, IntSet *marked_lines);
-void find_clouds_and_align(FILE *fq1, FILE *fq2, const char *ref_path, FILE *out, const char *rg);
+void find_clouds_and_align(FILE *fq1, FILE *fq2, const char *ref_path, FILE *out, const char *rg, const int apply_opt);
 
 typedef struct cloud {
 	double exp_cov;
@@ -54,7 +53,7 @@ int is_pair_relaxed(struct sam_record *r1, struct sam_record *r2);
 #define INSERT_AVG 250
 #define INSERT_MIN (-35)
 #define INSERT_MAX 750
-#define UNPAIRED_PENALTY (-6.0)
+#define UNPAIRED_PENALTY (-15.0)
 
 #define ERROR_RATE 0.001
 #define INDEL_RATE 0.0001

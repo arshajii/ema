@@ -82,9 +82,12 @@ static void print_help_and_exit(const char *argv0, int error)
 	P("  -o <output file>: specify output file [stdout]\n");
 	P("\n");
 	P("align: choose best alignments based on barcodes\n");
-	P("  -s <SAM file>: multi-mappings in SAM format [required]\n");
-	P("  -i <fai file>: fai file for reference used in mapping [required]\n");
+	P("  -1 <FASTQ1 path>: first (preprocessed and sorted) FASTQ file [required]\n");
+	P("  -2 <FASTQ2 path>: second (preprocessed and sorted) FASTQ file [required]\n");
+	P("  -r <FASTA path>: indexed reference [required]\n");
 	P("  -o <SAM file>: output SAM file [default: stdout]\n");
+	P("  -R <RG string>: full read group string (e.g. $'@RG\\tID:foo\\tSM:bar') [default: none]\n");
+	P("  -d: apply fragment read density optimization\n");
 	P("\n");
 	P("help: print this help message\n");
 	exit(error ? EXIT_FAILURE : EXIT_SUCCESS);
@@ -257,9 +260,10 @@ int main(const int argc, char *argv[])
 		char *fai = NULL;
 		char *out = NULL;
 		char *rg  = NULL;
+		int apply_opt = 0;
 		char c;
 
-		while ((c = getopt(argc, argv, "r:1:2:o:R:")) != -1) {
+		while ((c = getopt(argc, argv, "r:1:2:o:R:d")) != -1) {
 			switch (c) {
 			case 'r':
 				ref = strdup(optarg);
@@ -275,6 +279,9 @@ int main(const int argc, char *argv[])
 				break;
 			case 'R':
 				rg  = strdup(optarg);
+				break;
+			case 'd':
+				apply_opt = 1;
 				break;
 			default:
 				print_help_and_exit(argv0, 1);
@@ -329,7 +336,7 @@ int main(const int argc, char *argv[])
 			IOERROR(out);
 		}
 
-		find_clouds_and_align(fq1_file, fq2_file, ref, out_file, rg);
+		find_clouds_and_align(fq1_file, fq2_file, ref, out_file, rg, apply_opt);
 
 		fclose(fq1_file);
 		fclose(fq2_file);

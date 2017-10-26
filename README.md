@@ -35,6 +35,7 @@ align: choose best alignments based on barcodes
   -r <FASTA path>: indexed reference [required]
   -o <SAM file>: output SAM file [default: stdout]
   -R <RG string>: full read group string (e.g. $'@RG\tID:foo\tSM:bar') [default: none]
+  -d: apply fragment read density optimization
 
 help: print this help message
 ```

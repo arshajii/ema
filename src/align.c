@@ -116,7 +116,7 @@ static void append_alignments(bwaidx_t *ref,
 
 void mark_dups(SAMRecord *records, const size_t n_records);
 
-void find_clouds_and_align(FILE *fq1, FILE *fq2, const char *ref_path, FILE *out_file, const char *rg)
+void find_clouds_and_align(FILE *fq1, FILE *fq2, const char *ref_path, FILE *out_file, const char *rg, const int apply_opt)
 {
 	// BWA
 	fprintf(stderr, "BWA initialization...\n");
@@ -224,7 +224,8 @@ void find_clouds_and_align(FILE *fq1, FILE *fq2, const char *ref_path, FILE *out
 				//size_t n_split_clouds;
 				//Cloud **assignments = split_cloud_sim_anneal(cloud_to_split, cov, &clouds[nc], &n_split_clouds);
 
-				mark_optimal_alignments_in_cloud(cloud_to_split, cov);
+				if (apply_opt)
+					mark_optimal_alignments_in_cloud(cloud_to_split, cov);
 				size_t n_split_clouds = 1;
 
 				for (size_t i = 0; i < cov; i++) {

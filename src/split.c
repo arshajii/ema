@@ -417,7 +417,7 @@ void mark_optimal_alignments_in_cloud(SAMRecord **records, size_t n_records)
 	uint32_t cloud_lo = 0xffffffff;
 	uint32_t cloud_hi = 0x00000000;
 
-	if (n_records >= BUF_SIZE || n_records < 15)
+	if (n_records >= BUF_SIZE || n_records <= 5)
 		return;
 
 	/* remove records that are too far from the lowest edit distance */
@@ -535,7 +535,7 @@ void mark_optimal_alignments_in_cloud(SAMRecord **records, size_t n_records)
 	/* get initial configuration probability */
 	const size_t n_bins = (cloud_hi - cloud_lo)/BIN_SIZE + 1;
 
-	if (n_bins >= MAX_BINS || n_records < 15 || n_mmaps == 0) {
+	if (n_bins >= MAX_BINS || n_records <= 5 || n_mmaps == 0) {
 		free(records);
 		return;
 	}
