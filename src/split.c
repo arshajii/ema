@@ -607,12 +607,6 @@ void mark_optimal_alignments_in_cloud(SAMRecord **records, size_t n_records)
 
 					mate_old_bin = BIN_IDX_FOR_POS(mate_rec_old->pos, cloud_lo);
 					mate_new_bin = BIN_IDX_FOR_POS(mate_rec_new->pos, cloud_lo);
-					const double old_bin_prob_old = log_density_prob(bins[mate_old_bin]);
-					const double old_bin_prob_new = log_density_prob(bins[mate_old_bin] - 1);
-					const double new_bin_prob_old = log_density_prob(bins[mate_new_bin]);
-					const double new_bin_prob_new = log_density_prob(bins[mate_new_bin] + 1);
-					density_prob_change += (old_bin_prob_new - old_bin_prob_old) +
-					                       (new_bin_prob_new - new_bin_prob_old);
 
 					score_prob_change += (mate_rec_new->score - mate_rec_old->score)/SCORE_SCALE;
 					break;
@@ -623,12 +617,26 @@ void mark_optimal_alignments_in_cloud(SAMRecord **records, size_t n_records)
 		// compute change in probability
 		const size_t old_bin = BIN_IDX_FOR_POS(rec_old->pos, cloud_lo);
 		const size_t new_bin = BIN_IDX_FOR_POS(rec_new->pos, cloud_lo);
+		const int p1 = (mate_new_active >= 0 && old_bin == mate_old_bin) ? 2 : 1;  // check for source/dest overlap
+		const int p2 = (mate_new_active >= 0 && new_bin == mate_new_bin) ? 2 : 1;
 		const double old_bin_prob_old = log_density_prob(bins[old_bin]);
-		const double old_bin_prob_new = log_density_prob(bins[old_bin] - 1);
+		const double old_bin_prob_new = log_density_prob(bins[old_bin] - p1);
 		const double new_bin_prob_old = log_density_prob(bins[new_bin]);
-		const double new_bin_prob_new = log_density_prob(bins[new_bin] + 1);
+		const double new_bin_prob_new = log_density_prob(bins[new_bin] + p2);
 		density_prob_change += (old_bin_prob_new - old_bin_prob_old) +
 		                       (new_bin_prob_new - new_bin_prob_old);
+
+		if (p1 == 1 && mate_new_active >= 0) {
+			const double old_bin_prob_old = log_density_prob(bins[mate_old_bin]);
+			const double old_bin_prob_new = log_density_prob(bins[mate_old_bin] - 1);
+			density_prob_change += (old_bin_prob_new - old_bin_prob_old);
+		}
+
+		if (p2 == 1 && mate_new_active >= 0) {
+			const double new_bin_prob_old = log_density_prob(bins[mate_new_bin]);
+			const double new_bin_prob_new = log_density_prob(bins[mate_new_bin] + 1);
+			density_prob_change += (new_bin_prob_new - new_bin_prob_old);
+		}
 
 		score_prob_change += (rec_new->score - rec_old->score)/SCORE_SCALE;
 		const double prob_change = density_prob_change + score_prob_change;
