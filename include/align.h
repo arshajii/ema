@@ -53,7 +53,7 @@ int is_pair_relaxed(struct sam_record *r1, struct sam_record *r2);
 #define INSERT_AVG 250
 #define INSERT_MIN (-35)
 #define INSERT_MAX 750
-#define UNPAIRED_PENALTY (-15.0)
+#define UNPAIRED_PENALTY (-6.0)
 
 #define ERROR_RATE 0.001
 #define INDEL_RATE 0.0001
