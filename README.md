@@ -1,7 +1,7 @@
-EMA: Expectation Maximization Aligner
+EMA: Aligner for barcoded short-reads
 -------------------------------------
 
-EMA leverages an existing sensitive all-mapper to align barcoded short reads (such as those produced by 10X Genomics' sequencing platform) through expectation maximization.
+EMA uses a latent variable model to align barcoded short-reads (such as those produced by 10X Genomics' sequencing platform).
 
 ### Build
 Requires BWA library and GNU C99 or later. Can be compiled with `make`.
