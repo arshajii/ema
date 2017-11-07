@@ -58,3 +58,11 @@ Parallelism can be achieved by running multiple instances of EMA for the barcode
 ```
 $ EMAPATH=/path/to/ema/executable PICARDPATH=/path/to/picard/jar ./ema_wrapper.sh
 ```
+
+### Output
+
+EMA outputs a standard SAM file with several additional tags:
+
+- `XG`: alignment probability
+- `XC`: cloud identifier
+- `XA`: alternate high-probability alignments
