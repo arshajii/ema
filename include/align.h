@@ -43,11 +43,15 @@ int is_pair_relaxed(struct sam_record *r1, struct sam_record *r2);
 #define DIST_THRESH 50000
 
 /* lengths */
-#define BC_LEN     16
-#define MATE1_TRIM 7
-#define READ_LEN   151
-#define MATE1_LEN  (READ_LEN - BC_LEN - MATE1_TRIM)
-#define MATE2_LEN  READ_LEN
+#define BC_LEN              16
+#define MATE1_TRIM          7
+#define DEFAULT_READ_LENGTH 151
+extern int           READ_LEN;
+#define MATE1_LEN    (READ_LEN - BC_LEN - MATE1_TRIM)
+#define MATE2_LEN    READ_LEN
+#define MIN_READ_LEN (BC_LEN + MATE1_TRIM + 1)
+#define MAX_READ_LEN 200
+#define MAX_ID_LEN   100
 
 /* read properties */
 #define INSERT_AVG 250

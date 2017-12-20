@@ -1,7 +1,7 @@
 EMA: Aligner for barcoded short-reads
 -------------------------------------
 
-EMA uses a latent variable model to align barcoded short-reads (such as those produced by 10X Genomics' sequencing platform).
+EMA uses a latent variable model to align barcoded short-reads (such as those produced by [10x Genomics](https://www.10xgenomics.com)' sequencing platform).
 
 ### Build
 Requires BWA library and GNU C99 or later. Can be compiled with `make`.
@@ -18,10 +18,12 @@ preproc: preprocess barcoded FASTQ files
   -w <whitelist path>: barcode whitelist [required]
   -n <num buckets>: number of barcode buckets to make [20]
   -c <counts file>: preexisting barcode counts [none]
+  -l <read length>: per-mate read length (including barcode) [default: 151]
 
 sort: sort preprocessed FASTQs by barcode
   -1 <FASTQ1 path>: first FASTQ file [required]
   -2 <FASTQ2 path>: second FASTQ file [required]
+  -l <read length>: per-mate read length (including barcode) [default: 151]
 
 count: performs preliminary barcode count
   -1 <FASTQ1 path>: first FASTQ file [required]
@@ -36,6 +38,7 @@ align: choose best alignments based on barcodes
   -o <SAM file>: output SAM file [default: stdout]
   -R <RG string>: full read group string (e.g. $'@RG\tID:foo\tSM:bar') [default: none]
   -d: apply fragment read density optimization
+  -l <read length>: per-mate read length (including barcode) [default: 151]
 
 help: print this help message
 ```

@@ -9,8 +9,8 @@
 typedef struct fastq_record {
 	bc_t bc;
 	char id[100];
-	char read[READ_LEN+2];  // +2 for newline and null-term
-	char qual[READ_LEN+2];
+	char read[MAX_READ_LEN+2];  // +2 for newline and null-term
+	char qual[MAX_READ_LEN+2];
 } FASTQRecord;
 
 /* compact representation of one line in a SAM file */

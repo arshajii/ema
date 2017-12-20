@@ -455,16 +455,14 @@ void preprocess_fastqs(const char *fq1, const char *fq2, const char *wl_path, co
 #undef DEFAULT_FASTQ_NAME
 }
 
-#define MAX_ID_LEN 100
-
 struct fastq_record_pe {
 	char id1[MAX_ID_LEN+2];
-	char read1[MATE1_LEN+2];
-	char qual1[MATE1_LEN+2];
+	char read1[MAX_READ_LEN+2];
+	char qual1[MAX_READ_LEN+2];
 
 	char id2[MAX_ID_LEN+2];
-	char read2[MATE2_LEN+2];
-	char qual2[MATE2_LEN+2];
+	char read2[MAX_READ_LEN+2];
+	char qual2[MAX_READ_LEN+2];
 
 	bc_t bc;
 };
