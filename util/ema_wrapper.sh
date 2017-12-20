@@ -7,8 +7,8 @@ OUTBAM="ema_out.sorted.bam"
 OUTBAM_NO_DUPS="ema_out.sorted.dupsmarked.bam"
 FINALBAM="ema_out.full.sorted.bam"
 
-SHORT=r:R:t:
-LONG=ref:,rg:,threads:
+SHORT=r:R:l:t:
+LONG=ref:,rg:,readlength:,threads:
 
 if [[ -z "$EMAPATH" ]]; then
     echo "error: must specify EMAPATH in environment"
@@ -26,6 +26,7 @@ if [[ $? -ne 0 ]]; then
 fi
 eval set -- "$PARSED"
 
+l=151
 t=1
 
 while true; do
@@ -36,6 +37,10 @@ while true; do
             ;;
         -R|--rg)
             R="$2"
+            shift 2
+            ;;
+        -l|--readlength)
+            l="$2"
             shift 2
             ;;
         -t|--threads)
@@ -71,7 +76,7 @@ if [[ -z "$R" ]]; then
 fi
 
 echo "Aligning..."
-parallel -j "$t" --xapply "$EMAPATH align -1 {1} -2 {2} -r $r -o {1//}/$OUTSAM -R '$R'" \
+parallel -j "$t" --xapply "$EMAPATH align -1 {1} -2 {2} -r $r -l $l -o {1//}/$OUTSAM -R '$R'" \
                            ::: bucket0*/*1.preproc.fastq \
                            ::: bucket0*/*2.preproc.fastq
 bwa mem -t "$t" -M -R "${R//$'\t'/'\t'}" "$r" bucket_no_bc/*1.no_bc.fastq bucket_no_bc/*2.no_bc.fastq > "bucket_no_bc/$OUTSAM"
