@@ -152,7 +152,8 @@ void print_sam_record(SAMRecord *rec,
 	}
 
 	if (mate != NULL) {
-		flag |= SAM_READ_PROPER;
+		if (rec != NULL && is_pair(rec, mate))
+			flag |= SAM_READ_PROPER;
 
 		if (mate->rev)
 			flag |= SAM_MATE_REVERSED;
