@@ -1,13 +1,21 @@
 EMA: Aligner for barcoded short-reads
 -------------------------------------
 
-EMA uses a latent variable model to align barcoded short-reads (such as those produced by [10x Genomics](https://www.10xgenomics.com)' sequencing platform). More information is available in [our paper](https://www.biorxiv.org/content/early/2017/11/16/220236).
+EMA uses a latent variable model to align barcoded short-reads (such as the linked-reads produced by [10x Genomics](https://www.10xgenomics.com)' sequencing platform). More information is available in [our paper](https://www.biorxiv.org/content/early/2017/11/16/220236).
 
-### Build
-Requires BWA library and GNU C99 or later. Can be compiled with `make`.
+### Download and Compile
+In a nutshell:
+
+```
+$ git clone --recursive https://github.com/arshajii/ema
+$ cd ema
+$ make
+```
+
+Compilation requires GNU C99 or later. Note that the `--recursive` flag is needed because EMA uses BWA's C API.
 
 ### Usage
-Input FASTQs must first be preprocessed with `ema preproc` then sorted with `ema sort` (see below for more details). 
+Input FASTQs must first be preprocessed with `ema preproc` then sorted with `ema sort` (see below for more details).
 
 ```
 usage: ./ema <preproc|sort|count|align|help> [options]
