@@ -18,7 +18,7 @@ Compilation requires GNU C99 or later. Note that the `--recursive` flag is neede
 Input FASTQs must first be preprocessed with `ema preproc` then sorted with `ema sort` (see below for more details).
 
 ```
-usage: ./ema <preproc|sort|count|align|help> [options]
+usage: ema <preproc|sort|count|align|help> [options]
 
 preproc: preprocess barcoded FASTQ files
   -1 <FASTQ1 path>: first FASTQ file [required]
@@ -26,12 +26,12 @@ preproc: preprocess barcoded FASTQ files
   -w <whitelist path>: barcode whitelist [required]
   -n <num buckets>: number of barcode buckets to make [20]
   -c <counts file>: preexisting barcode counts [none]
-  -l <read length>: per-mate read length (including barcode) [default: 151]
+  -l <read length>: per-mate read length (including barcode) [151]
 
 sort: sort preprocessed FASTQs by barcode
   -1 <FASTQ1 path>: first FASTQ file [required]
   -2 <FASTQ2 path>: second FASTQ file [required]
-  -l <read length>: per-mate read length (including barcode) [default: 151]
+  -l <read length>: per-mate read length (including barcode) [151]
 
 count: performs preliminary barcode count
   -1 <FASTQ1 path>: first FASTQ file [required]
@@ -43,10 +43,10 @@ align: choose best alignments based on barcodes
   -1 <FASTQ1 path>: first (preprocessed and sorted) FASTQ file [required]
   -2 <FASTQ2 path>: second (preprocessed and sorted) FASTQ file [required]
   -r <FASTA path>: indexed reference [required]
-  -o <SAM file>: output SAM file [default: stdout]
-  -R <RG string>: full read group string (e.g. $'@RG\tID:foo\tSM:bar') [default: none]
+  -o <SAM file>: output SAM file [stdout]
+  -R <RG string>: full read group string (e.g. $'@RG\tID:foo\tSM:bar') [none]
   -d: apply fragment read density optimization
-  -l <read length>: per-mate read length (including barcode) [default: 151]
+  -l <read length>: per-mate read length (including barcode) [151]
 
 help: print this help message
 ```

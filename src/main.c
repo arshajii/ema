@@ -72,12 +72,12 @@ static void print_help_and_exit(const char *argv0, int error)
 	P("  -w <whitelist path>: specify whitelist [required]\n");
 	P("  -n <num buckets>: number of barcode buckets to make [20]\n");
 	P("  -c <counts file>: specify preexisting barcode counts [none]\n");
-	P("  -l <read length>: per-mate read length (including barcode) [default: %d]\n", DEFAULT_READ_LENGTH);
+	P("  -l <read length>: per-mate read length (including barcode) [%d]\n", DEFAULT_READ_LENGTH);
 	P("\n");
 	P("sort: sort preprocessed FASTQs by barcode\n");
 	P("  -1 <fastq1 path>: specify first FASTQ file [required]\n");
 	P("  -2 <fastq2 path>: specify second FASTQ file [required]\n");
-	P("  -l <read length>: per-mate read length (including barcode) [default: %d]\n", DEFAULT_READ_LENGTH);
+	P("  -l <read length>: per-mate read length (including barcode) [%d]\n", DEFAULT_READ_LENGTH);
 	P("\n");
 	P("count: performs preliminary barcode count\n");
 	P("  -1 <fastq1 path>: specify first FASTQ file [required]\n");
@@ -89,10 +89,10 @@ static void print_help_and_exit(const char *argv0, int error)
 	P("  -1 <FASTQ1 path>: first (preprocessed and sorted) FASTQ file [required]\n");
 	P("  -2 <FASTQ2 path>: second (preprocessed and sorted) FASTQ file [required]\n");
 	P("  -r <FASTA path>: indexed reference [required]\n");
-	P("  -o <SAM file>: output SAM file [default: stdout]\n");
-	P("  -R <RG string>: full read group string (e.g. $'@RG\\tID:foo\\tSM:bar') [default: none]\n");
+	P("  -o <SAM file>: output SAM file [stdout]\n");
+	P("  -R <RG string>: full read group string (e.g. $'@RG\\tID:foo\\tSM:bar') [none]\n");
 	P("  -d: apply fragment read density optimization\n");
-	P("  -l <read length>: per-mate read length (including barcode) [default: %d]\n", DEFAULT_READ_LENGTH);
+	P("  -l <read length>: per-mate read length (including barcode) [%d]\n", DEFAULT_READ_LENGTH);
 	P("\n");
 	P("help: print this help message\n");
 	exit(error ? EXIT_FAILURE : EXIT_SUCCESS);
