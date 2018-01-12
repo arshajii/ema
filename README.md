@@ -1,7 +1,7 @@
 EMA: Aligner for barcoded short-reads
 -------------------------------------
 
-EMA uses a latent variable model to align barcoded short-reads (such as the linked-reads produced by [10x Genomics](https://www.10xgenomics.com)' sequencing platform). More information is available in [our paper](https://www.biorxiv.org/content/early/2017/11/16/220236).
+EMA uses a latent variable model to align linked-reads (such as those produced by [10x Genomics](https://www.10xgenomics.com)' sequencing platform). More information is available in [our paper](https://www.biorxiv.org/content/early/2017/11/16/220236).
 
 ### Download and Compile
 In a nutshell:
