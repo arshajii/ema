@@ -86,7 +86,7 @@ parallel -j "$t" "samtools sort -m 5G -o {//}/$OUTBAM {}" ::: bucket*/$OUTSAM
 rm bucket*/*.sam
 
 echo "Removing duplicates..."
-parallel -j "$t" "java -Xmx10g -jar $PICARDPATH MarkDuplicates I={} O={//}/$OUTBAM_NO_DUPS M={//}marked_dup_metrics.txt READ_ONE_BARCODE_TAG=BX READ_TWO_BARCODE_TAG=BX" ::: bucket*/$OUTBAM
+parallel -j "$t" "java -Xmx10g -jar $PICARDPATH MarkDuplicates I={} O={//}/$OUTBAM_NO_DUPS M={//}/marked_dup_metrics.txt READ_ONE_BARCODE_TAG=BX READ_TWO_BARCODE_TAG=BX" ::: bucket*/$OUTBAM
 
 echo "BAM merge..."
 samtools merge -@ "$t" -f -c "$FINALBAM" bucket*/$OUTBAM_NO_DUPS
