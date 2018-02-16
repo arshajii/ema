@@ -5,7 +5,8 @@
 #include <stdint.h>
 #include <stdio.h>
 
-void find_clouds_and_align(FILE *fq1, FILE *fq2, const char *ref_path, FILE *out, const char *rg, const int apply_opt);
+void find_clouds_and_align(FILE *fq1, FILE *fq2, FILE *fqx,
+                           const char *ref_path, FILE *out, const char *rg, const int apply_opt);
 
 typedef struct cloud {
 	double exp_cov;
@@ -35,6 +36,8 @@ void init_cloud(Cloud *c);
 struct sam_record;
 int is_pair(struct sam_record *r1, struct sam_record *r2);
 int is_pair_relaxed(struct sam_record *r1, struct sam_record *r2);
+
+#define EM_ITERS 5
 
 /* reasonable clouds/barcode upper bound */
 #define MAX_CLOUDS_PER_BC 100000

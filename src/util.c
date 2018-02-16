@@ -4,15 +4,28 @@
 #include <ctype.h>
 #include <math.h>
 #include <assert.h>
+#include "align.h"
 #include "util.h"
+
+void copy_until_space(char *dest, char **src)
+{
+	size_t i;
+	for (i = 0; **src && !isspace(**src); i++) {
+		dest[i] = **src;
+		(*src)++;
+	}
+
+	dest[i] = '\0';
+	(*src)++;  // skip the last space
+}
 
 bc_t encode_bc(const char *bc)
 {
 #define BC_ADD_BASE(x) (encoded_bc |= (x))
 
 	bc_t encoded_bc = 0UL;
-	char *base = (char *)&bc[15];
-	for (int i = 0; i < 16; i++) {
+	char *base = (char *)&bc[BC_LEN-1];
+	for (int i = 0; i < BC_LEN; i++) {
 		encoded_bc <<= 2;
 		switch (*base--) {
 		case 'A': case 'a': BC_ADD_BASE(0UL); break;
@@ -30,7 +43,7 @@ bc_t encode_bc(const char *bc)
 
 void decode_bc(bc_t bc, char *out)
 {
-	for (int i = 0; i < 16; i++) {
+	for (int i = 0; i < BC_LEN; i++) {
 		out[i] = "ACGT"[bc & 0x3];
 		bc >>= 2;
 	}

@@ -100,11 +100,15 @@ static void normalize_cloud_probabilities(Cloud *clouds, const size_t nc)
 	}
 }
 
+static void read_special_fastq(FILE *fq, FASTQRecord **fq1_recs, FASTQRecord **fq2_recs);
+
 static int read_fastq_rec_bc_group(FILE *in,
                                    FASTQRecord *start,
                                    FASTQRecord **out,
                                    size_t *n_recs,
                                    size_t *out_cap);
+
+static int seek_next_barcode_group(FASTQRecord *fq_recs_full, FASTQRecord **fq_recs, size_t *n_recs);
 
 static void append_alignments(bwaidx_t *ref,
                               mem_opt_t *opts,
@@ -114,10 +118,12 @@ static void append_alignments(bwaidx_t *ref,
                               size_t *n_recs,
                               size_t *out_cap);
 
-void mark_dups(SAMRecord *records, const size_t n_records);
-
-void find_clouds_and_align(FILE *fq1, FILE *fq2, const char *ref_path, FILE *out_file, const char *rg, const int apply_opt)
+/* caution: caller must ensure (fq1 != NULL && fq2 != NULL) ^ (fqx != NULL) */
+void find_clouds_and_align(FILE *fq1, FILE *fq2, FILE *fqx,
+                           const char *ref_path, FILE *out_file, const char *rg, const int apply_opt)
 {
+#define STANDARD_FASTQ() (fqx == NULL)
+
 	// BWA
 	fprintf(stderr, "BWA initialization...\n");
 	arena_init();
@@ -141,13 +147,33 @@ void find_clouds_and_align(FILE *fq1, FILE *fq2, const char *ref_path, FILE *out
 
 #define INIT_FASTQ_CAP 5000
 #define INIT_ALIGN_CAP 1000000
+
+	/*
+	 * FASTQ I/O is broken into two cases:
+	 *   (i) Standard paired-end bc-sorted FASTQs:
+	 *         We read each barcode group as we need to from the file
+	 *  (ii) Our special FASTQ format (described below):
+	 *         We read the entire file, sort it, then partition it by
+	 *         barcode as needed.
+	 */
+
+	FASTQRecord *fq1_recs = NULL;       // for standard FASTQs
+	FASTQRecord *fq2_recs = NULL;       // for standard FASTQs
+	FASTQRecord *fq1_recs_full = NULL;  // for our special FASTQs
+	FASTQRecord *fq2_recs_full = NULL;  // for our special FASTQs
+
 	size_t n_fq1_recs = 0;
 	size_t fq1_recs_cap = INIT_FASTQ_CAP;
-	FASTQRecord *fq1_recs = safe_malloc(fq1_recs_cap * sizeof(*fq1_recs));
 
 	size_t n_fq2_recs = 0;
 	size_t fq2_recs_cap = INIT_FASTQ_CAP;
-	FASTQRecord *fq2_recs = safe_malloc(fq2_recs_cap * sizeof(*fq2_recs));
+
+	if (STANDARD_FASTQ()) {
+		fq1_recs = safe_malloc(fq1_recs_cap * sizeof(*fq1_recs));
+		fq2_recs = safe_malloc(fq2_recs_cap * sizeof(*fq2_recs));
+	} else {
+		read_special_fastq(fqx, &fq1_recs_full, &fq2_recs_full);
+	}
 
 	size_t n_records = 0;
 	size_t recs_cap = INIT_ALIGN_CAP;
@@ -158,8 +184,19 @@ void find_clouds_and_align(FILE *fq1, FILE *fq2, const char *ref_path, FILE *out
 	start1.id[0] = '\0';
 	start2.id[0] = '\0';
 
-	while ((read_fastq_rec_bc_group(fq1, &start1, &fq1_recs, &n_fq1_recs, &fq1_recs_cap) |
-	        read_fastq_rec_bc_group(fq2, &start2, &fq2_recs, &n_fq2_recs, &fq2_recs_cap)) == 0) {
+	while (1) {
+		int good;
+		if (STANDARD_FASTQ()) {
+			good = (read_fastq_rec_bc_group(fq1, &start1, &fq1_recs, &n_fq1_recs, &fq1_recs_cap) |
+			        read_fastq_rec_bc_group(fq2, &start2, &fq2_recs, &n_fq2_recs, &fq2_recs_cap)) == 0;
+		} else {
+			good = (seek_next_barcode_group(fq1_recs_full, &fq1_recs, &n_fq1_recs) |
+			        seek_next_barcode_group(fq2_recs_full, &fq2_recs, &n_fq2_recs)) == 0;
+		}
+
+		if (!good)
+			break;
+
 		const bc_t bc = fq1_recs[0].bc;
 		assert(n_fq1_recs == n_fq2_recs);
 		const int worth_doing_full_em = (n_fq1_recs >= 30);
@@ -169,7 +206,6 @@ void find_clouds_and_align(FILE *fq1, FILE *fq2, const char *ref_path, FILE *out
 		}
 
 		qsort(records, n_records, sizeof(*records), record_cmp);
-		//mark_dups(records, n_records);
 		SAMRecord *record = &records[0];
 
 		/* find and process clouds */
@@ -272,7 +308,7 @@ void find_clouds_and_align(FILE *fq1, FILE *fq2, const char *ref_path, FILE *out
 		normalize_cloud_probabilities(clouds, nc);
 
 		/* EM iterations */
-		for (int q = 0; q < 5; q++) {
+		for (int q = 0; q < EM_ITERS; q++) {
 			if (!worth_doing_full_em)
 				break;
 
@@ -407,8 +443,15 @@ void find_clouds_and_align(FILE *fq1, FILE *fq2, const char *ref_path, FILE *out
 	free(clouds);
 	free(sd);
 	free(records);
-	free(fq1_recs);
-	free(fq2_recs);
+
+	if (STANDARD_FASTQ()) {
+		free(fq1_recs);
+		free(fq2_recs);
+	} else {
+		free(fq1_recs_full);
+		free(fq2_recs_full);
+	}
+
 	arena_destroy();
 	bwa_idx_destroy(ref);
 }
@@ -444,7 +487,7 @@ static int read_fastq_rec_bc_group(FILE *in,
 {
 	*n_recs = 0;
 
-	if (start->id[0] == '\0' && read_fastq_rec(in, start) != 0)
+	if (IS_SENTINEL(*start) && read_fastq_rec(in, start) != 0)
 		return 1;
 
 	const bc_t bc = start->bc;
@@ -457,7 +500,7 @@ static int read_fastq_rec_bc_group(FILE *in,
 		}
 
 		if (read_fastq_rec(in, &(*out)[*n_recs]) != 0) {
-			start->id[0] = '\0';
+			SET_SENTINEL(*start);
 			return 0;
 		}
 
@@ -469,6 +512,91 @@ static int read_fastq_rec_bc_group(FILE *in,
 		++(*n_recs);
 	} while (1);
 }
+
+/*
+ * Special FASTQ file format:
+ *   barcode read1 id qual1 read2 qual2
+ *
+ * `read1` and `qual1` have the barcode bases/quals trimmed.
+ */
+static int special_fastq_record_cmp(const void *v1, const void *v2)
+{
+	const char *c1 = *(const char **)v1;
+    const char *c2 = *(const char **)v2;
+    return strncmp(c1, c2, BC_LEN);
+}
+
+static void read_special_fastq(FILE *fq, FASTQRecord **fq1_recs, FASTQRecord **fq2_recs)
+{
+	char bc_str[BC_LEN + 1];
+	char buf[5000];
+	const size_t n_records_actual = count_lines(fq) + 1;
+	char **records = safe_malloc(n_records_actual * sizeof(*records));
+	size_t n_records = 0;
+
+	while (fgets(buf, sizeof(buf), fq)) {
+		char *record = safe_malloc(strlen(buf) + 1);
+		strcpy(record, buf);
+		records[n_records++] = record;
+	}
+
+	qsort(records, n_records, sizeof(*records), special_fastq_record_cmp);
+
+	*fq1_recs = safe_malloc((n_records + 1) * sizeof(**fq1_recs));
+	*fq2_recs = safe_malloc((n_records + 1) * sizeof(**fq2_recs));
+
+	for (size_t i = 0; i < n_records; i++) {
+		char *p = records[i];
+		copy_until_space(bc_str, &p);
+		const bc_t bc = encode_bc(bc_str);
+
+		FASTQRecord *fq1 = &(*fq1_recs)[i];
+		FASTQRecord *fq2 = &(*fq2_recs)[i];
+
+		fq1->bc = bc;
+		fq2->bc = bc;
+
+		copy_until_space(fq1->read, &p);
+		copy_until_space(fq1->id, &p);
+		strcpy(fq2->id, fq1->id);
+		copy_until_space(fq1->qual, &p);
+		copy_until_space(fq2->read, &p);
+		copy_until_space(fq2->qual, &p);
+
+		free(records[i]);
+	}
+
+	SET_SENTINEL((*fq1_recs)[n_records]);
+	SET_SENTINEL((*fq2_recs)[n_records]);
+
+	free(records);
+}
+
+static int seek_next_barcode_group(FASTQRecord *fq_recs_full, FASTQRecord **fq_recs, size_t *n_recs)
+{
+	if (*fq_recs == NULL) {
+		*fq_recs = fq_recs_full;
+	} else {
+		*fq_recs = &(*fq_recs)[*n_recs];
+	}
+
+	if (IS_SENTINEL(**fq_recs)) {
+		*n_recs = 0;
+		return 1;
+	}
+
+	const bc_t bc = (*fq_recs)->bc;
+	FASTQRecord *p = *fq_recs;
+	*n_recs = 0;
+
+	while (!IS_SENTINEL(*p) && p->bc == bc) {
+		p++;
+		(*n_recs)++;
+	}
+
+	return 0;
+}
+
 
 static void score_alignment(SingleReadAlignment *r, SAMRecord *s)
 {
@@ -547,7 +675,7 @@ static void alignment_to_sam_rec(FASTQRecord *fq, FASTQRecord *fq_mate, SingleRe
 
 	char *c = &fq->id[1];  // skip first '@'
 	size_t i;
-	for (i = 0; *c != '\n'; i++)
+	for (i = 0; *c && *c != '\n'; i++)
 		s->ident[i] = *c++;
 	s->ident[i] = '\0';
 
@@ -669,26 +797,5 @@ static void append_alignments(bwaidx_t *ref,
 		(*out)[*n_recs - 1].unique = 1;
 
 	(*out)[*n_recs].bc = 0;
-}
-
-/* caution: `records` should be pos-sorted */
-void mark_dups(SAMRecord *records, const size_t n_records)
-{
-	for (size_t i = 1; i < n_records; i++) {
-		SAMRecord *curr = &records[i];
-		SAMRecord *prev = &records[i-1];
-
-		if (curr->mate != prev->mate)
-			continue;
-
-		const size_t read_len = (curr->mate == 0 ? MATE1_LEN : MATE2_LEN);
-
-		if (curr->bc == prev->bc &&
-		    curr->pos == prev->pos &&
-		    memcmp(curr->fq->read, prev->fq->read, read_len) == 0)
-		{
-			curr->duplicate = 1;
-		}
-	}
 }
 

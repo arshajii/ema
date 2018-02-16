@@ -13,6 +13,9 @@ typedef struct fastq_record {
 	char qual[MAX_READ_LEN+2];
 } FASTQRecord;
 
+#define IS_SENTINEL(rec)  ((rec).id[0] == '\0')
+#define SET_SENTINEL(rec) ((rec).id[0] = '\0')
+
 /* compact representation of one line in a SAM file */
 typedef struct sam_record {
 	bc_t bc;

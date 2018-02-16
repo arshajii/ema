@@ -88,6 +88,7 @@ static void print_help_and_exit(const char *argv0, int error)
 	P("align: choose best alignments based on barcodes\n");
 	P("  -1 <FASTQ1 path>: first (preprocessed and sorted) FASTQ file [required]\n");
 	P("  -2 <FASTQ2 path>: second (preprocessed and sorted) FASTQ file [required]\n");
+	P("  -s <EMA-FASTQ path>: specify special FASTQ path; mutually exclusive with -1 and -2 [none]\n");
 	P("  -r <FASTA path>: indexed reference [required]\n");
 	P("  -o <SAM file>: output SAM file [stdout]\n");
 	P("  -R <RG string>: full read group string (e.g. $'@RG\\tID:foo\\tSM:bar') [none]\n");
@@ -278,13 +279,14 @@ int main(const int argc, char *argv[])
 		char *ref = NULL;
 		char *fq1 = NULL;
 		char *fq2 = NULL;
+		char *fqx = NULL;
 		char *fai = NULL;
 		char *out = NULL;
 		char *rg  = NULL;
 		int apply_opt = 0;
 		char c;
 
-		while ((c = getopt(argc, argv, "r:1:2:o:R:dl:")) != -1) {
+		while ((c = getopt(argc, argv, "r:1:2:s:o:R:dl:")) != -1) {
 			switch (c) {
 			case 'r':
 				ref = strdup(optarg);
@@ -294,6 +296,9 @@ int main(const int argc, char *argv[])
 				break;
 			case '2':
 				fq2 = strdup(optarg);
+				break;
+			case 's':
+				fqx = strdup(optarg);
 				break;
 			case 'o':
 				out = strdup(optarg);
@@ -312,13 +317,18 @@ int main(const int argc, char *argv[])
 			}
 		}
 
+		if (fqx != NULL && (fq1 != NULL || fq2 != NULL)) {
+			fprintf(stderr, "error: must use either -s or -1/-2, not both\n");
+			exit(EXIT_FAILURE);
+		}
+
 		if (ref == NULL) {
 			fprintf(stderr, "error: specify reference FASTA with -r\n");
 			exit(EXIT_FAILURE);
 		}
 
-		if (fq1 == NULL || fq2 == NULL) {
-			fprintf(stderr, "error: specify input paired-end FASTQs with -1 and -2\n");
+		if (fqx == NULL && (fq1 == NULL || fq2 == NULL)) {
+			fprintf(stderr, "error: specify input paired-end FASTQs with (-1 and -2) or -s\n");
 			exit(EXIT_FAILURE);
 		}
 
@@ -332,16 +342,28 @@ int main(const int argc, char *argv[])
 			exit(EXIT_FAILURE);
 		}
 
-		FILE *fq1_file = fopen(fq1, "r");
+		FILE *fq1_file = NULL;
+		FILE *fq2_file = NULL;
+		FILE *fqx_file = NULL;
 
-		if (!fq1_file) {
-			IOERROR(fq1);
-		}
+		if (fqx != NULL) {
+			fqx_file = fopen(fqx, "r");
 
-		FILE *fq2_file = fopen(fq2, "r");
+			if (!fqx_file) {
+				IOERROR(fqx);
+			}
+		} else {
+			fq1_file = fopen(fq1, "r");
 
-		if (!fq2_file) {
-			IOERROR(fq2);
+			if (!fq1_file) {
+				IOERROR(fq1);
+			}
+
+			fq2_file = fopen(fq2, "r");
+
+			if (!fq2_file) {
+				IOERROR(fq2);
+			}
 		}
 
 #define FAI_EXT ".fai"
@@ -365,10 +387,11 @@ int main(const int argc, char *argv[])
 			IOERROR(out);
 		}
 
-		find_clouds_and_align(fq1_file, fq2_file, ref, out_file, rg, apply_opt);
+		find_clouds_and_align(fq1_file, fq2_file, fqx_file, ref, out_file, rg, apply_opt);
 
-		fclose(fq1_file);
-		fclose(fq2_file);
+		if (fq1_file) fclose(fq1_file);
+		if (fq2_file) fclose(fq2_file);
+		if (fqx_file) fclose(fqx_file);
 		fclose(out_file);
 
 		free(fai);
