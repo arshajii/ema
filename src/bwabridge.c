@@ -29,6 +29,7 @@ typedef struct {
 
 static Arena arena = {NULL, 0ULL, 0ULL};
 
+#pragma omp threadprivate(arena)
 void arena_init(void)
 {
 	if (arena.p == NULL) {
@@ -38,6 +39,7 @@ void arena_init(void)
 	}
 }
 
+#pragma omp threadprivate(arena)
 void arena_clear(void)
 {
 	for (size_t i = 0; i < arena.len; i++)
@@ -45,6 +47,7 @@ void arena_clear(void)
 	arena.len = 0;
 }
 
+#pragma omp threadprivate(arena)
 void arena_destroy(void)
 {
 	arena_clear();
@@ -54,6 +57,7 @@ void arena_destroy(void)
 	arena.cap = 0;
 }
 
+#pragma omp threadprivate(arena)
 void arena_push(void *p)
 {
 	if (arena.len == arena.cap) {

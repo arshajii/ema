@@ -12,6 +12,8 @@
 #include "util.h"
 #include "main.h"
 
+int NUM_THREADS = 1;
+
 int READ_LEN = DEFAULT_READ_LENGTH;
 
 #define MAX_CHROM_NAME_LEN 64
@@ -94,6 +96,7 @@ static void print_help_and_exit(const char *argv0, int error)
 	P("  -R <RG string>: full read group string (e.g. $'@RG\\tID:foo\\tSM:bar') [none]\n");
 	P("  -d: apply fragment read density optimization\n");
 	P("  -l <read length>: per-mate read length (including barcode) [%d]\n", DEFAULT_READ_LENGTH);
+	P("  -t <threads>: set number of threads [1]\n");
 	P("\n");
 	P("help: print this help message\n");
 	exit(error ? EXIT_FAILURE : EXIT_SUCCESS);
@@ -286,7 +289,7 @@ int main(const int argc, char *argv[])
 		int apply_opt = 0;
 		char c;
 
-		while ((c = getopt(argc, argv, "r:1:2:s:o:R:dl:")) != -1) {
+		while ((c = getopt(argc, argv, "r:1:2:s:o:R:dl:t:")) != -1) {
 			switch (c) {
 			case 'r':
 				ref = strdup(optarg);
@@ -311,6 +314,9 @@ int main(const int argc, char *argv[])
 				break;
 			case 'l':
 				READ_LEN = atoi(optarg);
+				break;
+			case 't':
+				NUM_THREADS = atoi(optarg);
 				break;
 			default:
 				print_help_and_exit(argv0, 1);

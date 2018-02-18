@@ -590,10 +590,10 @@ void mark_optimal_alignments_in_cloud(SAMRecord **records, size_t n_records)
 		double score_prob_change = 0.0;
 		int force_move = 0;
 		int mate_new_active = -1;
-		size_t mate_old_bin;
-		size_t mate_new_bin;
-		const int old_paired = active_mate != NULL && is_pair_relaxed(rec_old, active_mate);
-		const int new_paired = active_mate != NULL && is_pair_relaxed(rec_new, active_mate);
+		size_t mate_old_bin = 0;
+		size_t mate_new_bin = 0;
+		const int old_paired = active_mate != NULL && is_pair(rec_old, active_mate);
+		const int new_paired = active_mate != NULL && is_pair(rec_new, active_mate);
 
 		if (!old_paired && new_paired) {
 			force_move = 1;
@@ -601,7 +601,7 @@ void mark_optimal_alignments_in_cloud(SAMRecord **records, size_t n_records)
 			// try to move mate to preserve paired-end goodness
 			for (int i = 0; i < mmaps[mate_r].n; i++) {
 				SAMRecord *mate_rec_new = records[mmaps[mate_r].idx + i];
-				if (is_pair_relaxed(rec_new, mate_rec_new)) {
+				if (is_pair(rec_new, mate_rec_new)) {
 					SAMRecord *mate_rec_old = active_mate;
 					mate_new_active = i;
 

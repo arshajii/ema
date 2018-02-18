@@ -48,6 +48,7 @@ align: choose best alignments based on barcodes
   -R <RG string>: full read group string (e.g. $'@RG\tID:foo\tSM:bar') [none]
   -d: apply fragment read density optimization
   -l <read length>: per-mate read length (including barcode) [151]
+  -t <threads>: set number of threads [1]
 
 help: print this help message
 ```

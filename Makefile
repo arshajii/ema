@@ -2,9 +2,9 @@ TARGET = ema
 LIBS = -L$(BWADIR)/bwa -lbwa -lm -lz -lpthread
 CC = gcc
 WARNINGS = -Wall -Wextra -Werror
-CFLAGS = -std=gnu99 -march=native -O3 -flto -fstrict-aliasing $(WARNINGS)
-LFLAGS = -march=native -O3 -flto
-#CFLAGS = -std=gnu99 -fstrict-aliasing -ggdb -O0 $(WARNINGS)
+CFLAGS = -std=gnu99 -march=native -O3 -fopenmp -flto -fstrict-aliasing $(WARNINGS)
+LFLAGS = -march=native -O3 -flto -fopenmp -lpthread
+#CFLAGS = -std=gnu99 -fstrict-aliasing -fopenmp -ggdb -O0 $(WARNINGS)
 
 SRCDIR = src
 OBJDIR = obj
