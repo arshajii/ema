@@ -42,7 +42,8 @@ count: performs preliminary barcode count
 align: choose best alignments based on barcodes
   -1 <FASTQ1 path>: first (preprocessed and sorted) FASTQ file [required]
   -2 <FASTQ2 path>: second (preprocessed and sorted) FASTQ file [required]
-  -s <EMA-FASTQ path>: specify special FASTQ path; mutually exclusive with -1 and -2 [none]
+  -s <EMA-FASTQ path>: specify special FASTQ path [none]
+  -x: multi-input mode; takes input files after flags and spawns a thread for each
   -r <FASTA path>: indexed reference [required]
   -o <SAM file>: output SAM file [stdout]
   -R <RG string>: full read group string (e.g. $'@RG\tID:foo\tSM:bar') [none]

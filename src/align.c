@@ -110,7 +110,11 @@ static int read_fastq_rec_bc_group(FILE *in,
                                    size_t *n_recs,
                                    size_t *out_cap);
 
-static int seek_next_barcode_group(FASTQRecord *fq_recs_full, FASTQRecord **fq_recs, size_t *n_recs, int mate);
+static int seek_next_barcode_group(FASTQRecord *fq_recs_full,
+                                   FASTQRecord **fq_recs,
+                                   size_t *n_recs,
+                                   FASTQRecord *latest_fqr,
+                                   size_t latest_n);
 
 static void append_alignments(bwaidx_t *ref,
                               mem_opt_t *opts,
@@ -120,18 +124,32 @@ static void append_alignments(bwaidx_t *ref,
                               size_t *n_recs,
                               size_t *out_cap);
 
+static bwaidx_t *ref;
+static mem_opt_t *opts;
+
+void bwa_init(const char *ref_path)
+{
+	fprintf(stderr, "BWA initialization...\n");
+	ref = load_reference(ref_path);
+	opts = mem_opt_init();
+	opts->max_occ = 3000;
+}
+
+void bwa_dealloc(void)
+{
+	bwa_idx_destroy(ref);
+}
+
 /* caution: caller must ensure (fq1 != NULL && fq2 != NULL) ^ (fqx != NULL) */
-void find_clouds_and_align(FILE *fq1, FILE *fq2, FILE *fqx,
-                           const char *ref_path, FILE *out_file, const char *rg, const int apply_opt)
+void find_clouds_and_align(FILE *fq1, FILE *fq2, FILE *fqx, FILE *out_file, const char *rg, const int apply_opt)
 {
 #define STANDARD_FASTQ() (fqx == NULL)
 
-	// BWA
-	fprintf(stderr, "BWA initialization...\n");
-	arena_init();
-	bwaidx_t *ref = load_reference(ref_path);
-	mem_opt_t *opts = mem_opt_init();
-	opts->max_occ = 3000;
+	omp_lock_t in_lock;
+	omp_lock_t out_lock;
+
+	omp_init_lock(&in_lock);
+	omp_init_lock(&out_lock);
 
 	// SAM header
 	fprintf(stderr, "Processing reads...\n");
@@ -143,14 +161,22 @@ void find_clouds_and_align(FILE *fq1, FILE *fq2, FILE *fqx,
 		fprintf(out_file, "%s\n", rg);
 	const char *rg_id = (rg != NULL) ? (strstr(rg, "ID:") + 3) : NULL;  // pre-validated
 
-	FASTQRecord *fq1_recs_full = NULL;  // for our special FASTQs
-	FASTQRecord *fq2_recs_full = NULL;  // for our special FASTQs
+	/* for our special FASTQs */
+	FASTQRecord *fq1_recs_full = NULL;
+	FASTQRecord *fq2_recs_full = NULL;
+	// for coordinating the distribution of reads between threads:
+	int done = 0;
+	FASTQRecord *latest_fqr1 = NULL;
+	size_t latest_n1 = 0;
+	FASTQRecord *latest_fqr2 = NULL;
+	size_t latest_n2 = 0;
 
 	if (!STANDARD_FASTQ())
 		read_special_fastq(fqx, &fq1_recs_full, &fq2_recs_full);
 
 	#pragma omp parallel num_threads(NUM_THREADS)
 	{
+		arena_init();
 		size_t nc = 0;
 		Cloud *clouds = safe_malloc(MAX_CLOUDS_PER_BC * sizeof(*clouds));
 		SAMDict *sd = sam_dict_new();
@@ -193,15 +219,30 @@ void find_clouds_and_align(FILE *fq1, FILE *fq2, FILE *fqx,
 		while (1) {
 			int good;
 
-			#pragma omp critical
 			{
+				omp_set_lock(&in_lock);
 				if (STANDARD_FASTQ()) {
 					good = (read_fastq_rec_bc_group(fq1, &start1, &fq1_recs, &n_fq1_recs, &fq1_recs_cap) |
 					        read_fastq_rec_bc_group(fq2, &start2, &fq2_recs, &n_fq2_recs, &fq2_recs_cap)) == 0;
 				} else {
-					good = (seek_next_barcode_group(fq1_recs_full, &fq1_recs, &n_fq1_recs, 0) |
-					        seek_next_barcode_group(fq2_recs_full, &fq2_recs, &n_fq2_recs, 1)) == 0;
+					if (!done) {
+						good = (seek_next_barcode_group(fq1_recs_full, &fq1_recs, &n_fq1_recs, latest_fqr1, latest_n1) |
+						        seek_next_barcode_group(fq2_recs_full, &fq2_recs, &n_fq2_recs, latest_fqr2, latest_n2)) == 0;
+					} else {
+						good = 0;
+					}
+
+					if (good) {
+						latest_fqr1 = fq1_recs;
+						latest_n1 = n_fq1_recs;
+
+						latest_fqr2 = fq2_recs;
+						latest_n2 = n_fq2_recs;
+					} else {
+						done = 1;
+					}
 				}
+				omp_unset_lock(&in_lock);
 			}
 
 			if (!good)
@@ -435,10 +476,11 @@ void find_clouds_and_align(FILE *fq1, FILE *fq2, FILE *fqx,
 						m->mate = NULL;
 					}
 
-					#pragma omp critical
 					{
+						omp_set_lock(&out_lock);
 						print_sam_record(best, best_mate, best_gamma, cloud1, out_file, rg_id, alts1, n_alts1);
 						print_sam_record(best_mate, best, best_gamma_mate, cloud2, out_file, rg_id, alts2, n_alts2);
+						omp_unset_lock(&out_lock);
 					}
 				}
 
@@ -469,7 +511,8 @@ void find_clouds_and_align(FILE *fq1, FILE *fq2, FILE *fqx,
 	}
 
 	arena_destroy();
-	bwa_idx_destroy(ref);
+	omp_destroy_lock(&in_lock);
+	omp_destroy_lock(&out_lock);
 }
 
 static bc_t get_bc_direct(FASTQRecord *rec)
@@ -588,18 +631,15 @@ static void read_special_fastq(FILE *fq, FASTQRecord **fq1_recs, FASTQRecord **f
 	free(records);
 }
 
-static int seek_next_barcode_group(FASTQRecord *fq_recs_full, FASTQRecord **fq_recs, size_t *n_recs, int mate)
+static int seek_next_barcode_group(FASTQRecord *fq_recs_full,
+                                   FASTQRecord **fq_recs,
+                                   size_t *n_recs,
+                                   FASTQRecord *latest_fqr,
+                                   size_t latest_n)
 {
-	static int done[2] = {0, 0};
-	static FASTQRecord *latest_fqr[2] = {NULL, NULL};  // save this, since multiple threads call this function
-	static size_t latest_n[2] = {0, 0};
-
-	if (done[mate])
-		return 1;
-
-	if (latest_fqr[mate] != NULL) {
-		*fq_recs = latest_fqr[mate];
-		*n_recs = latest_n[mate];
+	if (latest_fqr != NULL) {
+		*fq_recs = latest_fqr;
+		*n_recs = latest_n;
 	}
 
 	if (*fq_recs == NULL) {
@@ -610,7 +650,6 @@ static int seek_next_barcode_group(FASTQRecord *fq_recs_full, FASTQRecord **fq_r
 
 	if (IS_SENTINEL(**fq_recs)) {
 		*n_recs = 0;
-		done[mate] = 1;
 		return 1;
 	}
 
@@ -623,8 +662,8 @@ static int seek_next_barcode_group(FASTQRecord *fq_recs_full, FASTQRecord **fq_r
 		(*n_recs)++;
 	}
 
-	latest_fqr[mate] = *fq_recs;
-	latest_n[mate] = *n_recs;
+	latest_fqr = *fq_recs;
+	latest_n = *n_recs;
 
 	return 0;
 }

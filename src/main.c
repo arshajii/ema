@@ -1,3 +1,4 @@
+#define __STDC_WANT_LIB_EXT2__ 1
 #include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
@@ -5,6 +6,9 @@
 #include <assert.h>
 #include <unistd.h>
 #include <getopt.h>
+
+#include <omp.h>
+
 #include "samrecord.h"
 #include "align.h"
 #include "barcodes.h"
@@ -90,7 +94,8 @@ static void print_help_and_exit(const char *argv0, int error)
 	P("align: choose best alignments based on barcodes\n");
 	P("  -1 <FASTQ1 path>: first (preprocessed and sorted) FASTQ file [required]\n");
 	P("  -2 <FASTQ2 path>: second (preprocessed and sorted) FASTQ file [required]\n");
-	P("  -s <EMA-FASTQ path>: specify special FASTQ path; mutually exclusive with -1 and -2 [none]\n");
+	P("  -s <EMA-FASTQ path>: specify special FASTQ path [none]\n");
+	P("  -x: multi-input mode; takes input files after flags and spawns a thread for each\n");
 	P("  -r <FASTA path>: indexed reference [required]\n");
 	P("  -o <SAM file>: output SAM file [stdout]\n");
 	P("  -R <RG string>: full read group string (e.g. $'@RG\\tID:foo\\tSM:bar') [none]\n");
@@ -287,9 +292,10 @@ int main(const int argc, char *argv[])
 		char *out = NULL;
 		char *rg  = NULL;
 		int apply_opt = 0;
+		int multi_input = 0;
 		char c;
 
-		while ((c = getopt(argc, argv, "r:1:2:s:o:R:dl:t:")) != -1) {
+		while ((c = getopt(argc, argv, "r:1:2:s:xo:R:dl:t:")) != -1) {
 			switch (c) {
 			case 'r':
 				ref = strdup(optarg);
@@ -302,6 +308,9 @@ int main(const int argc, char *argv[])
 				break;
 			case 's':
 				fqx = strdup(optarg);
+				break;
+			case 'x':
+				multi_input = 1;
 				break;
 			case 'o':
 				out = strdup(optarg);
@@ -323,18 +332,17 @@ int main(const int argc, char *argv[])
 			}
 		}
 
-		if (fqx != NULL && (fq1 != NULL || fq2 != NULL)) {
-			fprintf(stderr, "error: must use either -s or -1/-2, not both\n");
+		if (multi_input + (fqx != NULL) + (fq1 != NULL || fq2 != NULL) != 1) {
+			fprintf(stderr, "error: must specify *exactly one* of -1/-2, -s or -x\n");
 			exit(EXIT_FAILURE);
+		}
+
+		if ((fq1 != NULL) ^ (fq2 != NULL)) {
+			fprintf(stderr, "error: must specify both mates with -1/-2\n");
 		}
 
 		if (ref == NULL) {
 			fprintf(stderr, "error: specify reference FASTA with -r\n");
-			exit(EXIT_FAILURE);
-		}
-
-		if (fqx == NULL && (fq1 == NULL || fq2 == NULL)) {
-			fprintf(stderr, "error: specify input paired-end FASTQs with (-1 and -2) or -s\n");
 			exit(EXIT_FAILURE);
 		}
 
@@ -348,6 +356,10 @@ int main(const int argc, char *argv[])
 			exit(EXIT_FAILURE);
 		}
 
+		if (multi_input && out != NULL) {
+			fprintf(stderr, "warning: output file ignored in multi-input mode\n");
+		}
+
 		FILE *fq1_file = NULL;
 		FILE *fq2_file = NULL;
 		FILE *fqx_file = NULL;
@@ -358,7 +370,7 @@ int main(const int argc, char *argv[])
 			if (!fqx_file) {
 				IOERROR(fqx);
 			}
-		} else {
+		} else if (fq1 != NULL && fq2 != NULL) {
 			fq1_file = fopen(fq1, "r");
 
 			if (!fq1_file) {
@@ -386,20 +398,74 @@ int main(const int argc, char *argv[])
 
 		read_fai(fai_file);
 		fclose(fai_file);
+		bwa_init(ref);
 
-		FILE *out_file = (out == NULL ? stdout : fopen(out, "w"));
+		if (multi_input) {
+			const size_t n_inputs = argc - optind - 1;
 
-		if (!out_file) {
-			IOERROR(out);
+			if (n_inputs == 0) {
+				fprintf(stderr, "warning: no input files specified; nothing to do\n");
+				exit(EXIT_SUCCESS);
+			}
+
+			FILE **inputs  = safe_malloc(n_inputs * sizeof(*inputs));
+			FILE **outputs = safe_malloc(n_inputs * sizeof(*outputs));
+
+			for (int i = optind + 1; i < argc; i++) {
+				const int j = i - (optind + 1);  // w.r.t. `inputs` and `outputs`
+
+				const char *filename = strdup(argv[i]);
+				inputs[j] = fopen(filename, "r");
+
+				if (!inputs[j]) {
+					IOERROR(filename);
+				}
+
+				// now we open the SAM file to write to
+#define SAM_EXT ".sam"
+				char *samfile = safe_malloc(strlen(filename) + strlen(SAM_EXT) + 1);
+				strcpy(samfile, filename);
+				char *ext = strrchr(samfile, '.');
+				if (ext != NULL) {
+					*ext = '\0';
+				}
+				strcat(samfile, SAM_EXT);
+#undef SAM_EXT
+
+				outputs[j] = fopen(samfile, "w");
+
+				if (!outputs) {
+					IOERROR(samfile);
+				}
+			}
+
+			omp_set_nested(1);
+
+			#pragma omp parallel for num_threads(n_inputs)
+			for (size_t i = 0; i < n_inputs; i++) {
+				find_clouds_and_align(NULL, NULL, inputs[i], outputs[i], rg, apply_opt);
+				fclose(inputs[i]);
+				fclose(outputs[i]);
+			}
+
+			free(inputs);
+			free(outputs);
+		} else {
+			FILE *out_file = (out == NULL ? stdout : fopen(out, "w"));
+
+			if (!out_file) {
+				IOERROR(out);
+			}
+
+			find_clouds_and_align(fq1_file, fq2_file, fqx_file, out_file, rg, apply_opt);
+
+			if (fq1_file) fclose(fq1_file);
+			if (fq2_file) fclose(fq2_file);
+			if (fqx_file) fclose(fqx_file);
+			fclose(out_file);
 		}
 
-		find_clouds_and_align(fq1_file, fq2_file, fqx_file, ref, out_file, rg, apply_opt);
-
-		if (fq1_file) fclose(fq1_file);
-		if (fq2_file) fclose(fq2_file);
-		if (fqx_file) fclose(fqx_file);
-		fclose(out_file);
-
+		bwa_dealloc();
 		free(fai);
 		free(chroms);
 

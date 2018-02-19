@@ -5,6 +5,7 @@ WARNINGS = -Wall -Wextra -Werror
 CFLAGS = -std=gnu99 -march=native -O3 -fopenmp -flto -fstrict-aliasing $(WARNINGS)
 LFLAGS = -march=native -O3 -flto -fopenmp -lpthread
 #CFLAGS = -std=gnu99 -fstrict-aliasing -fopenmp -ggdb -O0 $(WARNINGS)
+#LFLAGS = -fopenmp -lpthread
 
 SRCDIR = src
 OBJDIR = obj
