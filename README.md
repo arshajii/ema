@@ -12,7 +12,7 @@ $ cd ema
 $ make
 ```
 
-Compilation requires GNU C99 or later. Note that the `--recursive` flag is needed because EMA uses BWA's C API.
+The `--recursive` flag is needed because EMA uses BWA's C API.
 
 ### Usage
 Input FASTQs must first be preprocessed with `ema preproc` then sorted with `ema sort` (see below for more details).
@@ -56,6 +56,8 @@ help: print this help message
 
 ### Preprocessing
 
+**Note: A much faster preprocessor has been implemented. The method below still works, but will be substantially slower. Details are below**
+
 For large data sets, preprocessing can most easily be done as follows (assuming interleaved FASTQs):
 
 ```
@@ -65,9 +67,22 @@ $ cat data/*.fastq | ema preproc -1 - -w /path/to/whitelist.txt -c counts_file
 
 Then the FASTQs in each bucket (except the no-barcode bucket) must be sorted with `ema sort`.
 
+#### Faster preprocessing 
+(Coming soon.)
+
 ### Parallelism
 
-Parallelism can be achieved by running multiple instances of EMA for the barcode buckets produced by `ema preprocess` (both for sorting and aligning). A script using [GNU Parallel](https://www.gnu.org/software/parallel/) is provided in [`utils`](util/) and can be run as follows (in the same directory as the `bucket` folders):
+EMA supports several modes of parallelism:
+
+1. Single-file parallelism: multiple worker threads work on a single FASTQ (specified with `-t <threads>`).
+2. Multi-file parallelism: multiple FASTQs can be specified after the flags, and each will be assigned a thread (enabled with `-x`).
+3. Multi-process parallelism: multiple EMA instances can be spawned to work on individual FASTQs.
+
+Options 1 and 2 are advantageous because they use only a single copy of the data structures needed in alignment (i.e. those of BWA), but have a slight overhead due to multithreading.
+
+The different options can be combined: for example, specifying `-t T` _and_ `-x` will spawn `T` threads to work on each input FASTQ.
+
+Option 3 can be enabled by running a separate instance of EMA for each barcode bucket produced during preprocessing (this can also be used to sort the FASTQs with `ema sort`). A script using [GNU Parallel](https://www.gnu.org/software/parallel/) is provided in [`utils`](util/) and can be run as follows (in the same directory as the `bucket` folders):
 
 ```
 $ EMAPATH=/path/to/ema/executable PICARDPATH=/path/to/picard/jar ./ema_wrapper.sh
