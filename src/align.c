@@ -615,9 +615,9 @@ static void read_special_fastq(FILE *fq, FASTQRecord **fq1_recs, FASTQRecord **f
 		fq1->bc = bc;
 		fq2->bc = bc;
 
-		copy_until_space(fq1->read, &p);
 		copy_until_space(fq1->id, &p);
 		strcpy(fq2->id, fq1->id);
+		copy_until_space(fq1->read, &p);
 		copy_until_space(fq1->qual, &p);
 		copy_until_space(fq2->read, &p);
 		copy_until_space(fq2->qual, &p);
