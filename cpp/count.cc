@@ -48,19 +48,20 @@ void count(const string &path)
 			assert(q[_] >= ILLUMINA_QUAL_OFFSET);
 			b[_] = hash_dna(s[_]) * QUAL_BASE + min(QUAL_BASE - 1, q[_] - ILLUMINA_QUAL_OFFSET);
 			barcode = (barcode << 2) | hash_dna(s[_]);
+			has_n |= (s[_] == 'N');
 		}
-		bool not_added = 1;
+		// bool not_added = 1;
 		if (!has_n) {
 			auto it = counts.find(barcode);
 			if (it != counts.end()) {
 				it->second++;
 				nice_reads++;
-				not_added = 0;
+				// not_added = 0;
 			}
 		}
-		if (not_added) {
-			full_counts[b]++;
-		}
+		// if (not_added) {
+		full_counts[b]++;
+		// }
 		getline(cin, s); sz += s.size() + 1;
 		getline(cin, s); sz += s.size() + 1; 
 		getline(cin, s); sz += s.size() + 1;

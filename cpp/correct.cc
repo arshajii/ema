@@ -27,7 +27,6 @@ struct full_count_t {
 
 struct stats_t {
 	int64_t total_passed, not_bucketed, corrected_h1, corrected_h2;
-	int64_t total_passed_bcd, not_bucketed_bcd, corrected_h1_bcd, corrected_h2_bcd;
 };
 
 /******************************************************************************/
@@ -41,7 +40,7 @@ void correct_barcode(int thread, int max_threads,
 	const double BC_CONF_THRESH = 0.975;
 	auto T = cur_time();
 
-	s = stats_t {0, 0, 0, 0, 0, 0, 0, 0};
+	s = stats_t {0, 0, 0, 0};
 
 	int64_t it_c = 0;
 	for (auto &it: full_counts) {
@@ -52,7 +51,6 @@ void correct_barcode(int thread, int max_threads,
 		const string &q = it.first;
 		full_count_t &fc = it.second;
 		s.total_passed += fc.count;
-		s.total_passed_bcd++;
 
 		uint32_t barcode = 0;
 		int ns = 0;
@@ -63,7 +61,6 @@ void correct_barcode(int thread, int max_threads,
 		}
 		if (ns > 1) {
 			s.not_bucketed += fc.count;
-			s.not_bucketed_bcd++;
 			fc.real_bcd = 0;
 			continue; // Nothing to find here!
 		}
@@ -151,9 +148,9 @@ void correct_barcode(int thread, int max_threads,
 			cor_type = 3;
 		}
 
-		if (cor_type == 1) s.corrected_h1 += fc.count, s.corrected_h1_bcd++;
-		if (cor_type == 2) s.corrected_h2 += fc.count, s.corrected_h2_bcd++; 
-		if (cor_type == 3) s.not_bucketed += fc.count, s.not_bucketed_bcd++; 
+		if (cor_type == 1) s.corrected_h1 += fc.count;
+		if (cor_type == 2) s.corrected_h2 += fc.count; 
+		if (cor_type == 3) s.not_bucketed += fc.count; 
 	}
 
 	eprn("  :: Thread {} took {} s", thread, elapsed(T));
@@ -226,28 +223,24 @@ void correct(const string &path,
 	for (int i = 0; i < nthreads; i++) {
 		threads.push_back(thread(correct_barcode, 
 			i, nthreads,
-			ref(counts), ref(full_counts), ref(stats[i]), /*do_h2*/ false));
+			ref(counts), ref(full_counts), ref(stats[i]), /*do_h2*/ true));
 	}
 	for (auto &t: threads) t.join(); 
 	eprn(":: Fixing barcodes ... done in {:.1f} s", elapsed(T)); T = cur_time();
 	for (int i = 1; i < nthreads; i++) {
 		stats[0].total_passed += stats[i].total_passed;
-		stats[0].total_passed_bcd += stats[i].total_passed_bcd;
 		stats[0].not_bucketed += stats[i].not_bucketed;
-		stats[0].not_bucketed_bcd += stats[i].not_bucketed_bcd;
 		stats[0].corrected_h1 += stats[i].corrected_h1;
-		stats[0].corrected_h1_bcd += stats[i].corrected_h1_bcd;
 		stats[0].corrected_h2 += stats[i].corrected_h2;
-		stats[0].corrected_h2_bcd += stats[i].corrected_h2_bcd;
 	}
-	eprn(":: Total processed: {:n} ({:n} barcodes)\n"
-		 "        no barcode: {:n} ({:n} barcodes)\n"
-		 "      H1-corrected: {:n} ({:n} barcodes)\n"
-		 "      H2-corrected: {:n} ({:n} barcodes)", 
-		 stats[0].total_passed, stats[0].total_passed_bcd, 
-		 stats[0].not_bucketed, stats[0].not_bucketed_bcd,
-		 stats[0].corrected_h1, stats[0].corrected_h1_bcd, 
-		 stats[0].corrected_h2, stats[0].corrected_h2_bcd);
+	eprn(":: Total processed: {:n} \n"
+		 "        no barcode: {:n} \n"
+		 "      H1-corrected: {:n} \n"
+		 "      H2-corrected: {:n} ", 
+		 stats[0].total_passed, 
+		 stats[0].not_bucketed,
+		 stats[0].corrected_h1, 
+		 stats[0].corrected_h2);
 	// exit(0);
 
 	/// 3. fix boundaries
@@ -306,20 +299,20 @@ void correct(const string &path,
 		getline(cin, q);
 		getline(cin, q);
 
-		uint32_t barcode;
+		// uint32_t barcode;
 		DO(BC_LEN) {
-			barcode = (barcode << 2) | hash_dna(s[_]);
+			// barcode = (barcode << 2) | hash_dna(r[_]);
 			b[_] = hash_dna(r[_]) * QUAL_BASE + min(QUAL_BASE - 1, q[_] - ILLUMINA_QUAL_OFFSET);
 		}
 		
-		if (counts.find(barcode) == counts.end()) {
-			auto it = full_counts.find(b);
-			if (it != full_counts.end()) {
-				barcode = it->second.real_bcd;
-			} else {
-				barcode = 0;
-			}
-		}
+		// if (counts.find(barcode) == counts.end()) {
+			uint32_t barcode = full_counts[b].real_bcd;
+			// if (it != full_counts.end()) {
+				// barcode = it->second.real_bcd;
+			// } else {
+				// barcode = 0;
+			// }
+		// }
 
 		auto &ff = file_offsets[barcode];
 		int file = ff.second;
