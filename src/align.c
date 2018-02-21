@@ -581,8 +581,8 @@ static int read_fastq_rec_bc_group(FILE *in,
 static int special_fastq_record_cmp(const void *v1, const void *v2)
 {
 	const char *c1 = *(const char **)v1;
-    const char *c2 = *(const char **)v2;
-    return strncmp(c1, c2, BC_LEN);
+	const char *c2 = *(const char **)v2;
+	return strncmp(c1, c2, BC_LEN);
 }
 
 static void read_special_fastq(FILE *fq, FASTQRecord **fq1_recs, FASTQRecord **fq2_recs)
