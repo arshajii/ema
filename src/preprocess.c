@@ -469,22 +469,22 @@ struct fastq_record_pe {
 
 static void fastq_record_pe_init(struct fastq_record_pe *read)
 {
-	read->id1[MAX_ID_LEN+1] = '\0';
-	read->read1[MATE1_LEN+1] = '\0';
-	read->qual1[MATE1_LEN+1] = '\0';
-	read->id2[MAX_ID_LEN+1] = '\0';
-	read->read2[MATE2_LEN+1] = '\0';
-	read->qual2[MATE2_LEN+1] = '\0';
+	read->id1[sizeof(read->id1) - 1]     = '\0';
+	read->read1[sizeof(read->read1) - 1] = '\0';
+	read->qual1[sizeof(read->qual1) - 1] = '\0';
+	read->id2[sizeof(read->id2) - 1]     = '\0';
+	read->read2[sizeof(read->read2) - 1] = '\0';
+	read->qual2[sizeof(read->qual2) - 1] = '\0';
 }
 
 static void fastq_record_pe_assert(struct fastq_record_pe *read)
 {
-	assert(read->id1[MAX_ID_LEN+1]  == '\0' &&
-	       read->read1[MATE1_LEN+1] == '\0' &&
-	       read->qual1[MATE1_LEN+1] == '\0' &&
-	       read->id2[MAX_ID_LEN+1]  == '\0' &&
-	       read->read2[MATE2_LEN+1] == '\0' &&
-	       read->qual2[MATE2_LEN+1] == '\0');
+	assert(read->id1[sizeof(read->id1) - 1]     == '\0' &&
+	       read->read1[sizeof(read->read1) - 1] == '\0' &&
+	       read->qual1[sizeof(read->qual1) - 1] == '\0' &&
+	       read->id2[sizeof(read->id2) - 1]     == '\0' &&
+	       read->read2[sizeof(read->read2) - 1] == '\0' &&
+	       read->qual2[sizeof(read->qual2) - 1] == '\0');
 }
 
 static int fastq_record_pe_cmp(const void *v1, const void *v2)
@@ -535,12 +535,12 @@ void sort_fastq(const char *fq1, const char *fq2)
 
 		struct fastq_record_pe *read = safe_malloc(sizeof(*read));
 		fastq_record_pe_init(read);
-		strncpy(read->id1,   id1,   MAX_ID_LEN+1);
-		strncpy(read->read1, read1, MATE1_LEN+1);
-		strncpy(read->qual1, qual1, MATE1_LEN+1);
-		strncpy(read->id2,   id2,   MAX_ID_LEN+1);
-		strncpy(read->read2, read2, MATE2_LEN+1);
-		strncpy(read->qual2, qual2, MATE2_LEN+1);
+		strncpy(read->id1,   id1,   sizeof(read->id1) - 1);
+		strncpy(read->read1, read1, sizeof(read->read1) - 1);
+		strncpy(read->qual1, qual1, sizeof(read->qual1) - 1);
+		strncpy(read->id2,   id2,   sizeof(read->id2) - 1);
+		strncpy(read->read2, read2, sizeof(read->read2) - 1);
+		strncpy(read->qual2, qual2, sizeof(read->qual2) - 1);
 		fastq_record_pe_assert(read);
 
 		const char *bc_ptr = strrchr(id1, ':');

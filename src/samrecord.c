@@ -125,7 +125,7 @@ void print_sam_record(SAMRecord *rec,
 		ident = rec->ident;
 		chrom = chrom_lookup(rec->chrom);
 		pos = rec->pos;
-		read_len = (rec->mate == 0 ? MATE1_LEN : MATE2_LEN);
+		read_len = rec->fq->rlen;
 		bc = rec->bc;
 		r = &rec->aln;
 		fq = rec->fq;
@@ -144,7 +144,7 @@ void print_sam_record(SAMRecord *rec,
 		flag |= ((rec->mate == 0) ? SAM_1ST_IN_PAIR : SAM_2ND_IN_PAIR);
 	} else {
 		ident = mate->ident;
-		read_len = (mate->mate == 0 ? MATE2_LEN : MATE1_LEN);
+		read_len = mate->fq_mate->rlen;
 		bc = mate->bc;
 		fq = mate->fq_mate;
 		flag |= SAM_READ_UNMAPPED;

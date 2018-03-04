@@ -282,18 +282,6 @@ void find_clouds_and_align(FILE *fq1, FILE *fq2, FILE *fqx, FILE *out_file, cons
 						for (size_t i = 0; i < cov; i++) {
 							sam_dict_del(sd, &record[i]);
 						}
-
-						/* unlink the cloud with a collision */
-						/*
-						if (c->parent != NULL)
-							c->parent->child = c->child;
-
-						if (c->child != NULL)
-							c->child->parent = c->parent;
-
-						c->child = NULL;
-						c->parent = NULL;
-						*/
 					}
 
 					++cov;
@@ -308,34 +296,18 @@ void find_clouds_and_align(FILE *fq1, FILE *fq2, FILE *fqx, FILE *out_file, cons
 					}
 
 					qsort(cloud_to_split, cov, sizeof(*cloud_to_split), name_cmp);
-					//size_t n_split_clouds;
-					//Cloud **assignments = split_cloud_sim_anneal(cloud_to_split, cov, &clouds[nc], &n_split_clouds);
 
 					if (apply_opt)
 						mark_optimal_alignments_in_cloud(cloud_to_split, cov);
-					size_t n_split_clouds = 1;
 
 					for (size_t i = 0; i < cov; i++) {
 						sam_dict_add(sd, cloud_to_split[i], &clouds[nc], 1);
-						/*
-						if (assignments[i] != NULL) {
-							sam_dict_add(sd, cloud_to_split[i], assignments[i], 1);
-						} else {
-							for (size_t j = 0; j < n_split_clouds; j++) {
-								sam_dict_add(sd, cloud_to_split[i], &clouds[nc + j], 1);
-							}
-						}
-						*/
 					}
 
 					free(cloud_to_split);
-					//free(assignments);
-
-					nc += n_split_clouds;
-				} else {
-					++nc;
 				}
 
+				++nc;
 				record = r+1;
 			}
 
@@ -525,7 +497,7 @@ static bc_t get_bc_direct(FASTQRecord *rec)
 
 static int read_fastq_rec(FILE *in, FASTQRecord *out)
 {
-	char sep[64];
+	char sep[256];
 
 	if (!fgets(out->id, sizeof(out->id), in))
 		return 1;
@@ -535,6 +507,7 @@ static int read_fastq_rec(FILE *in, FASTQRecord *out)
 	assert(fgets(out->qual, sizeof(out->qual), in));
 
 	out->bc = get_bc_direct(out);
+	out->rlen = strlen(out->read) - 1;  // -1 because of newline
 	return 0;
 }
 
@@ -812,7 +785,10 @@ static void append_alignments(bwaidx_t *ref,
 		} \
 	} while (0)
 
-	EasyAlignmentPairs alignments = bwa_mem_mate_sw(ref, opts, m1->read, MATE1_LEN, m2->read, MATE2_LEN, 25);
+	const int mate1_len = m1->rlen;
+	const int mate2_len = m2->rlen;
+
+	EasyAlignmentPairs alignments = bwa_mem_mate_sw(ref, opts, m1->read, mate1_len, m2->read, mate2_len, 25);
 	int best_dist = -1;
 	size_t aligns_added1 = 0;
 	size_t aligns_added2 = 0;
@@ -820,11 +796,11 @@ static void append_alignments(bwaidx_t *ref,
 	for (size_t i = 0; i < alignments.len1; i++) {
 		EasyAlignment *a = &alignments.a1[i];
 		SingleReadAlignment r;
-		bwa_smith_waterman(ref, opts, m1->read, MATE1_LEN, a->chained_hit, &r);
+		bwa_smith_waterman(ref, opts, m1->read, mate1_len, a->chained_hit, &r);
 
-		const int clip = (MATE1_LEN - (a->read_e - a->read_s));
+		const int clip = (mate1_len - (a->read_e - a->read_s));
 
-		if (clip >= MATE1_LEN/2)
+		if (clip >= mate1_len/2)
 			break;
 
 		const int dist = r.edit_dist + clip;
@@ -845,11 +821,11 @@ static void append_alignments(bwaidx_t *ref,
 	for (size_t i = 0; i < alignments.len2; i++) {
 		EasyAlignment *a = &alignments.a2[i];
 		SingleReadAlignment r;
-		bwa_smith_waterman(ref, opts, m2->read, MATE2_LEN, a->chained_hit, &r);
+		bwa_smith_waterman(ref, opts, m2->read, mate2_len, a->chained_hit, &r);
 
-		const int clip = (MATE2_LEN - (a->read_e - a->read_s));
+		const int clip = (mate2_len - (a->read_e - a->read_s));
 
-		if (clip >= MATE2_LEN/2)
+		if (clip >= mate2_len/2)
 			break;
 
 		const int dist = r.edit_dist + clip;

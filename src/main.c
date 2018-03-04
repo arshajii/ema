@@ -18,8 +18,6 @@
 
 int NUM_THREADS = 1;
 
-int READ_LEN = DEFAULT_READ_LENGTH;
-
 #define MAX_CHROM_NAME_LEN 64
 static struct { char chrom_name[MAX_CHROM_NAME_LEN]; } *chroms;
 
@@ -78,12 +76,10 @@ static void print_help_and_exit(const char *argv0, int error)
 	P("  -w <whitelist path>: specify whitelist [required]\n");
 	P("  -n <num buckets>: number of barcode buckets to make [20]\n");
 	P("  -c <counts file>: specify preexisting barcode counts [none]\n");
-	P("  -l <read length>: per-mate read length (including barcode) [%d]\n", DEFAULT_READ_LENGTH);
 	P("\n");
 	P("sort: sort preprocessed FASTQs by barcode\n");
 	P("  -1 <fastq1 path>: specify first FASTQ file [required]\n");
 	P("  -2 <fastq2 path>: specify second FASTQ file [required]\n");
-	P("  -l <read length>: per-mate read length (including barcode) [%d]\n", DEFAULT_READ_LENGTH);
 	P("\n");
 	P("count: performs preliminary barcode count\n");
 	P("  -1 <fastq1 path>: specify first FASTQ file [required]\n");
@@ -100,7 +96,6 @@ static void print_help_and_exit(const char *argv0, int error)
 	P("  -o <SAM file>: output SAM file [stdout]\n");
 	P("  -R <RG string>: full read group string (e.g. $'@RG\\tID:foo\\tSM:bar') [none]\n");
 	P("  -d: apply fragment read density optimization\n");
-	P("  -l <read length>: per-mate read length (including barcode) [%d]\n", DEFAULT_READ_LENGTH);
 	P("  -t <threads>: set number of threads [1]\n");
 	P("\n");
 	P("help: print this help message\n");
@@ -131,7 +126,7 @@ int main(const int argc, char *argv[])
 		char *counts = NULL;
 		char c;
 
-		while ((c = getopt(argc, argv, "w:1:2:n:c:l:")) != -1) {
+		while ((c = getopt(argc, argv, "w:1:2:n:c:")) != -1) {
 			switch (c) {
 			case '1':
 				fq1 = strdup(optarg);
@@ -147,9 +142,6 @@ int main(const int argc, char *argv[])
 				break;
 			case 'c':
 				counts = strdup(optarg);
-				break;
-			case 'l':
-				READ_LEN = atoi(optarg);
 				break;
 			default:
 				print_help_and_exit(argv0, 1);
@@ -174,11 +166,6 @@ int main(const int argc, char *argv[])
 			exit(EXIT_FAILURE);
 		}
 
-		if (READ_LEN < MIN_READ_LEN || READ_LEN > MAX_READ_LEN) {
-			fprintf(stderr, "error: read length out of range (valid: %d-%d)\n", MIN_READ_LEN, MAX_READ_LEN);
-			exit(EXIT_FAILURE);
-		}
-
 		preprocess_fastqs(fq1, fq2, wl, n, counts);
 		return EXIT_SUCCESS;
 	}
@@ -188,16 +175,13 @@ int main(const int argc, char *argv[])
 		char *fq2 = NULL;
 		char c;
 
-		while ((c = getopt(argc, argv, "1:2:l:")) != -1) {
+		while ((c = getopt(argc, argv, "1:2:")) != -1) {
 			switch (c) {
 			case '1':
 				fq1 = strdup(optarg);
 				break;
 			case '2':
 				fq2 = strdup(optarg);
-				break;
-			case 'l':
-				READ_LEN = atoi(optarg);
 				break;
 			default:
 				print_help_and_exit(argv0, 1);
@@ -206,11 +190,6 @@ int main(const int argc, char *argv[])
 
 		if (fq1 == NULL || fq2 == NULL) {
 			fprintf(stderr, "error: specify paired-end FASTQs with -1 and -2\n");
-			exit(EXIT_FAILURE);
-		}
-
-		if (READ_LEN < MIN_READ_LEN || READ_LEN > MAX_READ_LEN) {
-			fprintf(stderr, "error: read length out of range (valid: %d-%d)\n", MIN_READ_LEN, MAX_READ_LEN);
 			exit(EXIT_FAILURE);
 		}
 
@@ -295,7 +274,7 @@ int main(const int argc, char *argv[])
 		int multi_input = 0;
 		char c;
 
-		while ((c = getopt(argc, argv, "r:1:2:s:xo:R:dl:t:")) != -1) {
+		while ((c = getopt(argc, argv, "r:1:2:s:xo:R:dt:")) != -1) {
 			switch (c) {
 			case 'r':
 				ref = strdup(optarg);
@@ -321,9 +300,6 @@ int main(const int argc, char *argv[])
 			case 'd':
 				apply_opt = 1;
 				break;
-			case 'l':
-				READ_LEN = atoi(optarg);
-				break;
 			case 't':
 				NUM_THREADS = atoi(optarg);
 				break;
@@ -348,11 +324,6 @@ int main(const int argc, char *argv[])
 
 		if (rg != NULL && !validate_read_group(rg)) {
 			fprintf(stderr, "error: malformed read group: '%s' (remember to escape the argument string!)\n", rg);
-			exit(EXIT_FAILURE);
-		}
-
-		if (READ_LEN < MIN_READ_LEN || READ_LEN > MAX_READ_LEN) {
-			fprintf(stderr, "error: read length out of range (valid: %d-%d)\n", MIN_READ_LEN, MAX_READ_LEN);
 			exit(EXIT_FAILURE);
 		}
 
