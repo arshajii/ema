@@ -141,7 +141,7 @@ void bwa_dealloc(void)
 }
 
 /* caution: caller must ensure (fq1 != NULL && fq2 != NULL) ^ (fqx != NULL) */
-void find_clouds_and_align(FILE *fq1, FILE *fq2, FILE *fqx, FILE *out_file, const char *rg, const int apply_opt)
+void find_clouds_and_align(FILE *fq1, FILE *fq2, FILE *fqx, FILE *out_file, const int apply_opt)
 {
 #define STANDARD_FASTQ() (fqx == NULL)
 

@@ -8,7 +8,7 @@
 void bwa_init(const char *ref_path);
 void bwa_dealloc(void);
 
-void find_clouds_and_align(FILE *fq1, FILE *fq2, FILE *fqx, FILE *out, const char *rg, const int apply_opt);
+void find_clouds_and_align(FILE *fq1, FILE *fq2, FILE *fqx, FILE *out, const int apply_opt);
 
 typedef struct cloud {
 	double exp_cov;

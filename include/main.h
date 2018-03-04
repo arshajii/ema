@@ -11,6 +11,7 @@ chrom_t chrom_index(const char *chrom);
 void read_fai(FILE *fai_file);
 
 extern int NUM_THREADS;
+extern char *rg;
 extern char **pg_argv;
 extern int pg_argc;
 

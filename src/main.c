@@ -17,8 +17,9 @@
 #include "main.h"
 
 int NUM_THREADS = 1;
-char **pg_argv;
-int pg_argc;
+char *rg = NULL;
+char **pg_argv = NULL;
+int pg_argc = 0;
 
 #define MAX_CHROM_NAME_LEN 64
 static struct { char chrom_name[MAX_CHROM_NAME_LEN]; } *chroms;
@@ -131,7 +132,7 @@ int main(const int argc, char *argv[])
 		char *counts = NULL;
 		char c;
 
-		while ((c = getopt(argc, argv, "w:1:2:n:c:")) != -1) {
+		while ((c = getopt(argc-1, &argv[1], "w:1:2:n:c:")) != -1) {
 			switch (c) {
 			case '1':
 				fq1 = strdup(optarg);
@@ -180,7 +181,7 @@ int main(const int argc, char *argv[])
 		char *fq2 = NULL;
 		char c;
 
-		while ((c = getopt(argc, argv, "1:2:")) != -1) {
+		while ((c = getopt(argc-1, &argv[1], "1:2:")) != -1) {
 			switch (c) {
 			case '1':
 				fq1 = strdup(optarg);
@@ -209,7 +210,7 @@ int main(const int argc, char *argv[])
 		char *out = NULL;
 		char c;
 
-		while ((c = getopt(argc, argv, "1:w:io:")) != -1) {
+		while ((c = getopt(argc-1, &argv[1], "1:w:io:")) != -1) {
 			switch (c) {
 			case '1':
 				fq1 = strdup(optarg);
@@ -274,12 +275,11 @@ int main(const int argc, char *argv[])
 		char *fqx = NULL;
 		char *fai = NULL;
 		char *out = NULL;
-		char *rg  = NULL;
 		int apply_opt = 0;
 		int multi_input = 0;
 		char c;
 
-		while ((c = getopt(argc, argv, "r:1:2:s:xo:R:dt:")) != -1) {
+		while ((c = getopt(argc-1, &argv[1], "r:1:2:s:xo:R:dt:")) != -1) {
 			switch (c) {
 			case 'r':
 				ref = strdup(optarg);
@@ -419,7 +419,7 @@ int main(const int argc, char *argv[])
 
 			#pragma omp parallel for num_threads(n_inputs)
 			for (size_t i = 0; i < n_inputs; i++) {
-				find_clouds_and_align(NULL, NULL, inputs[i], outputs[i], rg, apply_opt);
+				find_clouds_and_align(NULL, NULL, inputs[i], outputs[i], apply_opt);
 				fclose(inputs[i]);
 				fclose(outputs[i]);
 			}
@@ -433,7 +433,7 @@ int main(const int argc, char *argv[])
 				IOERROR(out);
 			}
 
-			find_clouds_and_align(fq1_file, fq2_file, fqx_file, out_file, rg, apply_opt);
+			find_clouds_and_align(fq1_file, fq2_file, fqx_file, out_file, apply_opt);
 
 			if (fq1_file) fclose(fq1_file);
 			if (fq2_file) fclose(fq2_file);
