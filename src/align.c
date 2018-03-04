@@ -151,15 +151,27 @@ void find_clouds_and_align(FILE *fq1, FILE *fq2, FILE *fqx, FILE *out_file, cons
 	omp_init_lock(&in_lock);
 	omp_init_lock(&out_lock);
 
-	// SAM header
 	fprintf(stderr, "Processing reads...\n");
+
+	/* SAM header */
+	// HD
 	fprintf(out_file, "@HD\tVN:1.3\tSO:unsorted\n");
+
+	// SQ
 	for (int32_t i = 0; i < ref->bns->n_seqs; i++) {
 		fprintf(out_file, "@SQ\tSN:%s\tLN:%d\n", ref->bns->anns[i].name, ref->bns->anns[i].len);
 	}
+
+	// RG
 	if (rg != NULL)
 		fprintf(out_file, "%s\n", rg);
 	const char *rg_id = (rg != NULL) ? (strstr(rg, "ID:") + 3) : NULL;  // pre-validated
+
+	// PG
+	fprintf(out_file, "@PG\tID:ema\tPN:ema\tVN:%s\tCL:%s", VERSION, pg_argv[0]);
+	for (int i = 1; i < pg_argc; i++)
+		fprintf(out_file, " %s", pg_argv[i]);
+	fprintf(out_file, "\n");
 
 	/* for our special FASTQs */
 	FASTQRecord *fq1_recs_full = NULL;

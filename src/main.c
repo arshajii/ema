@@ -17,6 +17,8 @@
 #include "main.h"
 
 int NUM_THREADS = 1;
+char **pg_argv;
+int pg_argc;
 
 #define MAX_CHROM_NAME_LEN 64
 static struct { char chrom_name[MAX_CHROM_NAME_LEN]; } *chroms;
@@ -115,6 +117,9 @@ int main(const int argc, char *argv[])
 		fprintf(stderr, "note: use '%s help' for usage information.\n", argv0);
 		return EXIT_SUCCESS;
 	}
+
+	pg_argv = argv;
+	pg_argc = argc;
 
 	const char *mode = argv[1];
 
