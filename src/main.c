@@ -71,7 +71,7 @@ static void print_help_and_exit(const char *argv0, int error)
 #define P(...) fprintf(out, __VA_ARGS__)
 
 	FILE *out = error ? stderr : stdout;
-	P("usage: %s <preproc|align|help> [options]\n", argv0);
+	P("usage: %s <preproc|sort|count|align|help> [options]\n", argv0);
 	P("\n");
 	P("preproc: preprocess barcoded FASTQ files\n");
 	P("  -1 <fastq1 path>: specify first FASTQ file [required]\n");
