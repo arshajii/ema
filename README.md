@@ -1,5 +1,5 @@
-EMA: An aligner for linked-read sequencing data
------------------------------------------------
+EMA: An aligner for barcoded short-read sequencing data
+-------------------------------------------------------
 
 EMA uses a latent variable model to align barcoded short-reads (such as those produced by [10x Genomics](https://www.10xgenomics.com)' sequencing platform). More information is available in [our paper](https://www.biorxiv.org/content/early/2017/11/16/220236).
 
