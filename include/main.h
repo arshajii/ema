@@ -16,7 +16,7 @@ extern int NUM_THREADS;
 #define DEBUG 0
 #define TRACK_READ ""
 
-#define VERSION "0.0.2"
+#define VERSION "0.1.0"
 
 #endif /* MAIN_H */
 
