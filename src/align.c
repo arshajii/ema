@@ -56,7 +56,7 @@ int is_pair_relaxed(SAMRecord *r1, SAMRecord *r2)
 }
 
 
-// mate 1 is reversed
+/* mate 1 is reversed */
 static double mate_dist_penalty(const int64_t mate1_pos, const int64_t mate2_pos)
 {
 	const int64_t d = mate1_pos - mate2_pos;
@@ -723,7 +723,13 @@ static void score_alignment(SingleReadAlignment *r, SAMRecord *s)
 	                      clipping*LOG10_CLIP_SCORE);
 }
 
-static void alignment_to_sam_rec(FASTQRecord *fq, FASTQRecord *fq_mate, SingleReadAlignment *r, SAMRecord *s, unsigned mate, int clip, int clip_edit_dist)
+static void alignment_to_sam_rec(FASTQRecord *fq,
+                                 FASTQRecord *fq_mate,
+                                 SingleReadAlignment *r,
+                                 SAMRecord *s,
+                                 unsigned mate,
+                                 int clip,
+                                 int clip_edit_dist)
 {
 	s->bc = fq->bc;
 	s->chrom = chrom_index(r->chrom);
