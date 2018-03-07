@@ -14,15 +14,14 @@
 
 static double log_density_prob(unsigned int density)
 {
-	/* density probabilities per 1k bin */
-	static double density_probs[] = {0.6, 0.05, 0.2, 0.01};
-	static double density_probs_log[SIZE(density_probs)];
-	static const size_t size = SIZE(density_probs);
+	static double density_probs_log[SIZE(tech->density_probs)];
 	static int init = 0;
+
+	const size_t size = tech->n_density_probs;
 
 	if (!init) {
 		for (size_t i = 0; i < size; i++) {
-			const double p = density_probs[i];
+			const double p = tech->density_probs[i];
 			density_probs_log[i] = log(p);
 		}
 

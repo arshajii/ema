@@ -21,6 +21,8 @@ char *rg = NULL;
 char **pg_argv = NULL;
 int pg_argc = 0;
 
+PlatformProfile *tech;
+
 #define MAX_CHROM_NAME_LEN 64
 static struct { char chrom_name[MAX_CHROM_NAME_LEN]; } *chroms;
 
@@ -99,6 +101,7 @@ static void print_help_and_exit(const char *argv0, int error)
 	P("  -o <SAM file>: output SAM file [stdout]\n");
 	P("  -R <RG string>: full read group string (e.g. $'@RG\\tID:foo\\tSM:bar') [none]\n");
 	P("  -d: apply fragment read density optimization\n");
+	P("  -p <platform>: sequencing platform (one of '10x', 'tru', 'cpt') [10x]\n");
 	P("  -t <threads>: set number of threads [1]\n");
 	P("\n");
 	P("help: print this help message\n");
@@ -277,9 +280,10 @@ int main(const int argc, char *argv[])
 		char *out = NULL;
 		int apply_opt = 0;
 		int multi_input = 0;
+		char *platform = "10x";
 		char c;
 
-		while ((c = getopt(argc-1, &argv[1], "r:1:2:s:xo:R:dt:")) != -1) {
+		while ((c = getopt(argc-1, &argv[1], "r:1:2:s:xo:R:dp:t:")) != -1) {
 			switch (c) {
 			case 'r':
 				ref = strdup(optarg);
@@ -305,6 +309,9 @@ int main(const int argc, char *argv[])
 			case 'd':
 				apply_opt = 1;
 				break;
+			case 'p':
+				platform = strdup(optarg);
+				break;
 			case 't':
 				NUM_THREADS = atoi(optarg);
 				break;
@@ -318,8 +325,9 @@ int main(const int argc, char *argv[])
 			exit(EXIT_FAILURE);
 		}
 
-		if ((fq1 != NULL) ^ (fq2 != NULL)) {
-			fprintf(stderr, "error: must specify both mates with -1/-2\n");
+		if (fq1 == NULL && fq2 != NULL) {
+			fprintf(stderr, "error: cannot specify -2 without -1\n");
+			exit(EXIT_FAILURE);
 		}
 
 		if (ref == NULL) {
@@ -329,6 +337,11 @@ int main(const int argc, char *argv[])
 
 		if (rg != NULL && !validate_read_group(rg)) {
 			fprintf(stderr, "error: malformed read group: '%s' (remember to escape the argument string!)\n", rg);
+			exit(EXIT_FAILURE);
+		}
+
+		if ((tech = get_platform_profile_by_name(platform)) == NULL) {
+			fprintf(stderr, "error: invalid platform name: '%s'\n", platform);
 			exit(EXIT_FAILURE);
 		}
 
@@ -353,10 +366,14 @@ int main(const int argc, char *argv[])
 				IOERROR(fq1);
 			}
 
-			fq2_file = fopen(fq2, "r");
+			if (fq2 != NULL) {
+				fq2_file = fopen(fq2, "r");
 
-			if (!fq2_file) {
-				IOERROR(fq2);
+				if (!fq2_file) {
+					IOERROR(fq2);
+				}
+			} else {
+				fq2_file = fq1_file;
 			}
 		}
 
@@ -436,7 +453,7 @@ int main(const int argc, char *argv[])
 			find_clouds_and_align(fq1_file, fq2_file, fqx_file, out_file, apply_opt);
 
 			if (fq1_file) fclose(fq1_file);
-			if (fq2_file) fclose(fq2_file);
+			if (fq2_file && fq2_file != fq1_file) fclose(fq2_file);
 			if (fqx_file) fclose(fqx_file);
 			fclose(out_file);
 		}
