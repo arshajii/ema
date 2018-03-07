@@ -359,7 +359,7 @@ int main(const int argc, char *argv[])
 			if (!fqx_file) {
 				IOERROR(fqx);
 			}
-		} else if (fq1 != NULL && fq2 != NULL) {
+		} else if (fq1 != NULL) {
 			fq1_file = fopen(fq1, "r");
 
 			if (!fq1_file) {
