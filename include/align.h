@@ -42,10 +42,8 @@ int is_pair_relaxed(struct sam_record *r1, struct sam_record *r2);
 #define EM_ITERS 5
 
 /* reasonable clouds/barcode upper bound */
-#define MAX_CLOUDS_PER_BC 100000
-
-/* cloud distance threshold */
-#define DIST_THRESH 50000
+#define MAX_CLOUDS_PER_BC_SMALL   100000
+#define MAX_CLOUDS_PER_BC_LARGE 10000000
 
 /* lengths */
 #define BC_LEN     16
@@ -61,7 +59,6 @@ int is_pair_relaxed(struct sam_record *r1, struct sam_record *r2);
 #define INSERT_MAX 750
 #define UNPAIRED_PENALTY (-15.0)
 
-#define ERROR_RATE 0.001
 #define INDEL_RATE 0.0001
 #define CLIP_RATE  0.03
 

@@ -110,6 +110,16 @@ static int read_fastq_rec_bc_group(FILE *in,
                                    size_t *n_recs,
                                    size_t *out_cap);
 
+static int read_fastq_rec_bc_group_interleaved(FILE *in,
+                                               FASTQRecord *start1,
+                                               FASTQRecord **out1,
+                                               size_t *n_recs1,
+                                               size_t *out_cap1,
+                                               FASTQRecord *start2,
+                                               FASTQRecord **out2,
+                                               size_t *n_recs2,
+                                               size_t *out_cap2);
+
 static int seek_next_barcode_group(FASTQRecord *fq_recs_full,
                                    FASTQRecord **fq_recs,
                                    size_t *n_recs,
@@ -190,7 +200,7 @@ void find_clouds_and_align(FILE *fq1, FILE *fq2, FILE *fqx, FILE *out_file, cons
 	{
 		arena_init();
 		size_t nc = 0;
-		Cloud *clouds = safe_malloc(MAX_CLOUDS_PER_BC * sizeof(*clouds));
+		Cloud *clouds = safe_malloc((tech->many_clouds ? MAX_CLOUDS_PER_BC_LARGE : MAX_CLOUDS_PER_BC_SMALL) * sizeof(*clouds));
 		SAMDict *sd = sam_dict_new();
 
 #define INIT_FASTQ_CAP 5000
@@ -234,8 +244,12 @@ void find_clouds_and_align(FILE *fq1, FILE *fq2, FILE *fqx, FILE *out_file, cons
 			{
 				omp_set_lock(&in_lock);
 				if (STANDARD_FASTQ()) {
-					good = (read_fastq_rec_bc_group(fq1, &start1, &fq1_recs, &n_fq1_recs, &fq1_recs_cap) |
-					        read_fastq_rec_bc_group(fq2, &start2, &fq2_recs, &n_fq2_recs, &fq2_recs_cap)) == 0;
+					if (fq1 != fq2)
+						good = (read_fastq_rec_bc_group(fq1, &start1, &fq1_recs, &n_fq1_recs, &fq1_recs_cap) |
+						        read_fastq_rec_bc_group(fq2, &start2, &fq2_recs, &n_fq2_recs, &fq2_recs_cap)) == 0;
+					else
+						good = read_fastq_rec_bc_group_interleaved(fq1, &start1, &fq1_recs, &n_fq1_recs, &fq1_recs_cap,
+						                                                &start2, &fq2_recs, &n_fq2_recs, &fq2_recs_cap) == 0;
 				} else {
 					if (!done) {
 						good = (seek_next_barcode_group(fq1_recs_full, &fq1_recs, &n_fq1_recs, latest_fqr1, latest_n1) |
@@ -284,7 +298,7 @@ void find_clouds_and_align(FILE *fq1, FILE *fq2, FILE *fqx, FILE *out_file, cons
 
 				while ((r+1)->bc == r->bc &&
 				       (r+1)->chrom == r->chrom &&
-				       (r+1)->pos - r->pos <= DIST_THRESH) {
+				       (r+1)->pos - r->pos <= tech->dist_thresh) {
 
 					++r;
 
@@ -340,7 +354,9 @@ void find_clouds_and_align(FILE *fq1, FILE *fq2, FILE *fqx, FILE *out_file, cons
 				Cloud *c = &clouds[i];
 				c->weight = c->exp_cov;
 			}
-			normalize_cloud_probabilities(clouds, nc);
+
+			if (!tech->many_clouds)
+				normalize_cloud_probabilities(clouds, nc);
 
 			/* EM iterations */
 			for (int q = 0; q < EM_ITERS; q++) {
@@ -374,6 +390,23 @@ void find_clouds_and_align(FILE *fq1, FILE *fq2, FILE *fqx, FILE *out_file, cons
 						mate_num_cands = mate->num_cands;
 					}
 
+#define MAX_ALNS 10000
+					double cloud_weights[MAX_ALNS];
+					double cw_tot = 0;
+					assert(num_cands < MAX_ALNS);
+#undef MAX_ALNS
+
+					if (tech->many_clouds) {  // with many clouds, normalize probs for each read individually
+						for (size_t i = 0; i < num_cands; i++) {
+							cloud_weights[i] = clouds[i]->weight;
+							cw_tot += cloud_weights[i];
+						}
+
+						for (size_t i = 0; i < num_cands; i++) {
+							cloud_weights[i] /= cw_tot;
+						}
+					}
+
 					int max_old_gamma_index = 0;
 					int max_gamma_index = 0;
 
@@ -403,7 +436,7 @@ void find_clouds_and_align(FILE *fq1, FILE *fq2, FILE *fqx, FILE *out_file, cons
 						if (old_gammas[i] > old_gammas[max_old_gamma_index])
 							max_old_gamma_index = i;
 
-						gammas[i] = records[i]->score + log(clouds[i]->weight) + best_mate_score;
+						gammas[i] = records[i]->score + (tech->many_clouds ? log(cloud_weights[i]) : log(clouds[i]->weight)) + best_mate_score;
 					}
 
 					normalize_log_probs(gammas, num_cands);
@@ -434,7 +467,9 @@ void find_clouds_and_align(FILE *fq1, FILE *fq2, FILE *fqx, FILE *out_file, cons
 					Cloud *c = &clouds[i];
 					c->weight = c->exp_cov;
 				}
-				normalize_cloud_probabilities(clouds, nc);
+
+				if (!tech->many_clouds)
+					normalize_cloud_probabilities(clouds, nc);
 			}
 
 			/* find best alignments */
@@ -470,7 +505,7 @@ void find_clouds_and_align(FILE *fq1, FILE *fq2, FILE *fqx, FILE *out_file, cons
 
 				SAMDictEnt *t = e;
 				e = e->link_next;
-				free(t);
+				sde_free(t);
 			}
 
 			nc = 0;
@@ -480,7 +515,7 @@ void find_clouds_and_align(FILE *fq1, FILE *fq2, FILE *fqx, FILE *out_file, cons
 		}
 
 		free(clouds);
-		free(sd);
+		sam_dict_free(sd);
 		free(records);
 
 		if (STANDARD_FASTQ()) {
@@ -501,10 +536,7 @@ void find_clouds_and_align(FILE *fq1, FILE *fq2, FILE *fqx, FILE *out_file, cons
 
 static bc_t get_bc_direct(FASTQRecord *rec)
 {
-	char *bc_str = strrchr(rec->id, ':');
-	assert(bc_str != NULL);
-	*bc_str = '\0';
-	return encode_bc(&bc_str[1]);
+	return tech->extract_bc(rec);
 }
 
 static int read_fastq_rec(FILE *in, FASTQRecord *out)
@@ -554,6 +586,65 @@ static int read_fastq_rec_bc_group(FILE *in,
 		}
 
 		++(*n_recs);
+	} while (1);
+}
+
+static int read_fastq_rec_bc_group_interleaved(FILE *in,
+                                               FASTQRecord *start1,
+                                               FASTQRecord **out1,
+                                               size_t *n_recs1,
+                                               size_t *out_cap1,
+                                               FASTQRecord *start2,
+                                               FASTQRecord **out2,
+                                               size_t *n_recs2,
+                                               size_t *out_cap2)
+{
+	*n_recs1 = 0;
+	*n_recs2 = 0;
+
+	if (IS_SENTINEL(*start1) && read_fastq_rec(in, start1) != 0) {
+		assert(IS_SENTINEL(*start2));
+		return 1;
+	}
+
+	assert(!(IS_SENTINEL(*start2) && read_fastq_rec(in, start2) != 0));
+
+	const bc_t bc = start1->bc;
+	assert(bc == start2->bc);
+
+	(*out1)[(*n_recs1)++] = *start1;
+	(*out2)[(*n_recs2)++] = *start2;
+
+	do {
+		if (*n_recs1 == *out_cap1) {
+			*out_cap1 = (*out_cap1 * 3)/2 + 1;
+			*out1 = safe_realloc(*out1, *out_cap1 * sizeof(**out1));
+		}
+
+		if (*n_recs2 == *out_cap2) {
+			*out_cap2 = (*out_cap2 * 3)/2 + 1;
+			*out2 = safe_realloc(*out2, *out_cap2 * sizeof(**out2));
+		}
+
+		if (read_fastq_rec(in, &(*out1)[*n_recs1]) != 0) {
+			SET_SENTINEL(*start1);
+			SET_SENTINEL(*start2);
+			return 0;
+		}
+
+		assert(read_fastq_rec(in, &(*out2)[*n_recs2]) == 0);
+
+		if ((*out1)[*n_recs1].bc != bc) {
+			assert((*out2)[*n_recs2].bc != bc);
+			*start1 = (*out1)[*n_recs1];
+			*start2 = (*out2)[*n_recs2];
+			return 0;
+		}
+
+		assert((*out2)[*n_recs2].bc == bc);
+
+		++(*n_recs1);
+		++(*n_recs2);
 	} while (1);
 }
 
@@ -666,11 +757,11 @@ static void score_alignment(SingleReadAlignment *r, SAMRecord *s)
 	static int init = 0;
 
 	if (!init) {
-		LOG_MATCH_SCORE = log(1 - ERROR_RATE);
-		LOG_MISMATCH_SCORE = log(ERROR_RATE);
+		LOG_MATCH_SCORE = log(1 - tech->error_rate);
+		LOG_MISMATCH_SCORE = log(tech->error_rate);
 		LOG_INDEL_SCORE = log(INDEL_RATE);
 		LOG_CLIP_SCORE = log(CLIP_RATE);
-		LOG10_MISMATCH_SCORE = log10(ERROR_RATE);
+		LOG10_MISMATCH_SCORE = log10(tech->error_rate);
 		LOG10_INDEL_SCORE = log10(INDEL_RATE);
 		LOG10_CLIP_SCORE = log10(CLIP_RATE);
 		init = 1;
@@ -819,13 +910,13 @@ static void append_alignments(bwaidx_t *ref,
 		const int clip = (mate1_len - (a->read_e - a->read_s));
 
 		if (clip >= mate1_len/2)
-			break;
+			continue;
 
 		const int dist = r.edit_dist + clip;
 		if (i == 0)
 			best_dist = dist;
 		else if (dist - best_dist > EXTRA_SEARCH_DEPTH)
-			break;
+			continue;
 
 		REALLOC_IF_NECESSARY();
 		r.mapq = mem_approx_mapq_se_insist(opts, a->chained_hit);
@@ -844,13 +935,13 @@ static void append_alignments(bwaidx_t *ref,
 		const int clip = (mate2_len - (a->read_e - a->read_s));
 
 		if (clip >= mate2_len/2)
-			break;
+			continue;
 
 		const int dist = r.edit_dist + clip;
 		if (i == 0)
 			best_dist = dist;
 		else if (dist - best_dist > EXTRA_SEARCH_DEPTH)
-			break;
+			continue;
 
 		REALLOC_IF_NECESSARY();
 		r.mapq = mem_approx_mapq_se_insist(opts, a->chained_hit);

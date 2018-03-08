@@ -3,8 +3,8 @@
 
 #include <stdlib.h>
 #include <stdint.h>
-#include "samrecord.h"
 #include "util.h"
+#include "techs.h"
 
 char *chrom_lookup(const chrom_t chrom);
 chrom_t chrom_index(const char *chrom);
@@ -14,6 +14,8 @@ extern int NUM_THREADS;
 extern char *rg;
 extern char **pg_argv;
 extern int pg_argc;
+
+extern PlatformProfile *tech;
 
 /* debugging */
 #define DEBUG 0

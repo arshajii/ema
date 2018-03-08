@@ -8,29 +8,52 @@
 #include "util.h"
 #include "samdict.h"
 
-static SAMDictEnt *sde_new(SAMRecord *key, Cloud *v)
+SAMDictEnt *sde_new(SAMRecord *key, Cloud *v)
 {
 	SAMDictEnt *sde = safe_malloc(sizeof(*sde));
 	sde->key = key;
 	sde->mate = NULL;
+
+	sde->cand_records = safe_malloc(DEFAULT_CANDS * sizeof(*(sde->cand_records)));
+	sde->cand_clouds = safe_malloc(DEFAULT_CANDS * sizeof(*(sde->cand_clouds)));
+	sde->gammas = safe_malloc(DEFAULT_CANDS * sizeof(*(sde->gammas)));
+
 	sde->cand_records[0] = key;
 	sde->cand_clouds[0] = v;
 	sde->gammas[0] = key->score;
+
+	sde->cap_cands = DEFAULT_CANDS;
 	sde->num_cands = 1;
 	sde->visited = 0;
 	return sde;
 }
 
+void sde_free(SAMDictEnt *sde)
+{
+	free(sde->cand_records);
+	free(sde->cand_clouds);
+	free(sde->gammas);
+	free(sde);
+}
+
 SAMDict *sam_dict_new(void)
 {
 	SAMDict *sd = safe_malloc(sizeof(*sd));
+	sd->cap = (tech->many_clouds ? SAM_DICT_CAP_LARGE : SAM_DICT_CAP_SMALL);
+	sd->entries = safe_malloc(sd->cap * sizeof(*(sd->entries)));
 	sam_dict_clear(sd);
 	return sd;
 }
 
+void sam_dict_free(SAMDict *sd)
+{
+	free(sd->entries);
+	free(sd);
+}
+
 static SAMDictEnt *find_for_key(SAMDict *sd, SAMRecord *k)
 {
-	const uint32_t idx = (record_hash(k) & (SAM_DICT_CAP - 1));
+	const uint32_t idx = (record_hash(k) & (sd->cap - 1));
 	for (SAMDictEnt *e = sd->entries[idx]; e != NULL; e = e->clash_next) {
 		if (record_eq(k, e->key)) {
 			return e;
@@ -41,7 +64,7 @@ static SAMDictEnt *find_for_key(SAMDict *sd, SAMRecord *k)
 
 static SAMDictEnt *find_mate_for_key(SAMDict *sd, SAMRecord *k)
 {
-	const uint32_t idx = (record_hash_mate(k) & (SAM_DICT_CAP - 1));
+	const uint32_t idx = (record_hash_mate(k) & (sd->cap - 1));
 	for (SAMDictEnt *e = sd->entries[idx]; e != NULL; e = e->clash_next) {
 		if (record_eq_mate(k, e->key)) {
 			return e;
@@ -65,26 +88,36 @@ int sam_dict_add(SAMDict *sd, SAMRecord *k, Cloud *v, const int force)
 					return 1;
 				}
 
-				/* create link in the disjoint-set structure */
-				Cloud *root1 = parent;
-				while (root1->parent != NULL) {
-					root1 = root1->parent;
-				}
-
-				Cloud *root2 = v;
-				while (root2->parent != NULL) {
-					root2 = root2->parent;
-				}
-
-				if (root1 != root2) {
-					Cloud *leaf = parent;
-					while (leaf->child != NULL) {
-						leaf = leaf->child;
+				if (!tech->many_clouds) {
+					/* create link in the disjoint-set structure */
+					Cloud *root1 = parent;
+					while (root1->parent != NULL) {
+						root1 = root1->parent;
 					}
 
-					root2->parent = leaf;
-					leaf->child = root2;
+					Cloud *root2 = v;
+					while (root2->parent != NULL) {
+						root2 = root2->parent;
+					}
+
+					if (root1 != root2) {
+						Cloud *leaf = parent;
+						while (leaf->child != NULL) {
+							leaf = leaf->child;
+						}
+
+						root2->parent = leaf;
+						leaf->child = root2;
+					}
 				}
+			}
+
+			if (num_cands == e->cap_cands) {
+				const size_t new_cap = (e->cap_cands * 3)/2 + 1;
+				e->cand_records = safe_realloc(e->cand_records, new_cap * sizeof(*(e->cand_records)));
+				e->cand_clouds  = safe_realloc(e->cand_clouds,  new_cap * sizeof(*(e->cand_clouds)));
+				e->gammas       = safe_realloc(e->gammas,       new_cap * sizeof(*(e->gammas)));
+				e->cap_cands = new_cap;
 			}
 
 			e->cand_clouds[num_cands] = v;
@@ -93,7 +126,7 @@ int sam_dict_add(SAMDict *sd, SAMRecord *k, Cloud *v, const int force)
 			++(e->num_cands);
 		}
 	} else {
-		const uint32_t idx = (record_hash(k) & (SAM_DICT_CAP - 1));
+		const uint32_t idx = (record_hash(k) & (sd->cap - 1));
 		e = sde_new(k, v);
 		e->link_next = sd->head;
 		sd->head = e;
@@ -126,7 +159,7 @@ void sam_dict_del(SAMDict *sd, SAMRecord *k)
 void sam_dict_clear(SAMDict *sd)
 {
 	sd->head = NULL;
-	memset(sd->entries, 0, SAM_DICT_CAP*sizeof(SAMDictEnt *));
+	memset(sd->entries, 0, sd->cap * sizeof(*(sd->entries)));
 	sd->count = 0;
 }
 
