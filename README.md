@@ -46,12 +46,13 @@ align: choose best alignments based on barcodes
   -o <SAM file>: output SAM file [stdout]
   -R <RG string>: full read group string (e.g. $'@RG\tID:foo\tSM:bar') [none]
   -d: apply fragment read density optimization
+  -p <platform>: sequencing platform (one of '10x', 'tru', 'cpt') [10x]
   -t <threads>: set number of threads [1]
 
 help: print this help message
 ```
 
-### Preprocessing
+### Preprocessing (10x only)
 
 **Note: A much faster preprocessor has been implemented. The method below still works, but will be substantially slower. Details are below**
 
