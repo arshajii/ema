@@ -8,9 +8,9 @@ EMA uses a latent variable model to align barcoded short-reads (such as those pr
 In a nutshell:
 
 ```
-$ git clone --recursive https://github.com/arshajii/ema
-$ cd ema
-$ make
+git clone --recursive https://github.com/arshajii/ema
+cd ema
+make
 ```
 
 The `--recursive` flag is needed because EMA uses BWA's C API.
@@ -60,11 +60,22 @@ help: print this help message
 For large data sets, preprocessing can most easily be done as follows (assuming interleaved FASTQs):
 
 ```
-$ cat data/*.fastq | ema count -1 - -w /path/to/whitelist.txt -i -o counts_file
-$ cat data/*.fastq | ema preproc -1 - -w /path/to/whitelist.txt -c counts_file
+cat data/*.fastq | ema count -1 - -w /path/to/whitelist.txt -i -o counts_file
+cat data/*.fastq | ema preproc -1 - -w /path/to/whitelist.txt -c counts_file
 ```
 
-Then the FASTQs in each bucket (except the no-barcode bucket) must be sorted with `ema sort`.
+Then the FASTQs in each bucket (except the no-barcode bucket) must be sorted with `ema sort`:
+
+```
+ema sort -1 bucket000/*_1.fastq -2 bucket000/*_2.fastq
+ema sort -1 bucket001/*_1.fastq -2 bucket001/*_2.fastq
+...
+ema sort -1 bucket019/*_1.fastq -2 bucket019/*_2.fastq
+```
+
+Note that these can all be done in parallel (e.g. with [GNU Parallel](https://www.gnu.org/software/parallel/)).
+
+Instructions for preprocessing data from other sequencing platforms can be found [here](https://github.com/arshajii/ema-paper-data/blob/master/experiments.ipynb).
 
 #### Faster preprocessing 
 (Coming soon.)
@@ -84,7 +95,7 @@ The different options can be combined: for example, specifying `-t T` _and_ `-x`
 Option 3 can be enabled by running a separate instance of EMA for each barcode bucket produced during preprocessing (this can also be used to sort the FASTQs with `ema sort`). A script using [GNU Parallel](https://www.gnu.org/software/parallel/) is provided in [`utils`](util/) and can be run as follows (in the same directory as the `bucket` folders):
 
 ```
-$ EMAPATH=/path/to/ema/executable PICARDPATH=/path/to/picard/jar ./ema_wrapper.sh
+EMAPATH=/path/to/ema/executable PICARDPATH=/path/to/picard/jar ./ema_wrapper.sh
 ```
 
 ### Output
