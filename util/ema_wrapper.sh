@@ -74,7 +74,7 @@ echo "Aligning..."
 parallel -j "$t" --xapply "$EMAPATH align -1 {1} -2 {2} -r $r -o {1//}/$OUTSAM -R '$R'" \
                            ::: bucket0*/*1.preproc.fastq \
                            ::: bucket0*/*2.preproc.fastq
-bwa mem -t "$t" -M -R "'$R'" "$r" bucket_no_bc/*1.no_bc.fastq bucket_no_bc/*2.no_bc.fastq > "bucket_no_bc/$OUTSAM"
+bwa mem -t "$t" -M -R "$R" "$r" bucket_no_bc/*1.no_bc.fastq bucket_no_bc/*2.no_bc.fastq > "bucket_no_bc/$OUTSAM"
 
 echo "SAM -> sorted BAM..."
 parallel -j "$t" "samtools sort -m 5G -o {//}/$OUTBAM {}" ::: bucket*/$OUTSAM
