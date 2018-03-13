@@ -65,9 +65,7 @@ void read_fai(FILE *fai_file)
 
 static int validate_read_group(const char *rg)
 {
-	return strstr(rg, "\t") == NULL &&
-	       strstr(rg, "@RG\t") == &rg[0] &&
-	       strstr(rg, "\tID:") != NULL;
+	return strstr(rg, "@RG\t") == &rg[0] && strstr(rg, "\tID:") != NULL;
 }
 
 static void print_help_and_exit(const char *argv0, int error)
@@ -338,7 +336,7 @@ int main(const int argc, char *argv[])
 		}
 
 		if (rg != NULL && !validate_read_group(rg)) {
-			fprintf(stderr, "error: malformed read group: '%s' (remember to escape the argument string!)\n", rg);
+			fprintf(stderr, "error: malformed read group: '%s'\n", rg);
 			exit(EXIT_FAILURE);
 		}
 
