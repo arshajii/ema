@@ -22,6 +22,7 @@ typedef uint32_t bc_t;
 typedef uint8_t chrom_t;
 
 void copy_until_space(char *dest, char **src);
+char *escape(char *s);
 
 bc_t encode_bc(const char *bc);
 void decode_bc(bc_t bc, char *out);

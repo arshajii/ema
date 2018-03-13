@@ -45,7 +45,7 @@ while true; do
         -h|--help)
             echo "required options:"
             echo "-r  indexed reference FASTA path"
-            echo "-R  full read group string (eg. $'@RG\tID:foo\tSM:bar' -- notice the $)"
+            echo "-R  full read group string (eg. '@RG\tID:foo\tSM:bar')"
             echo "-t  number of jobs"
             shift
             exit 0
@@ -66,7 +66,7 @@ if [[ -z "$r" ]]; then
 fi
 
 if [[ -z "$R" ]]; then
-    echo "error: specify full read group string with -R (eg. $'@RG\tID:foo\tSM:bar' -- notice the $)"
+    echo "error: specify full read group string with -R (eg. '@RG\tID:foo\tSM:bar')"
     exit 6
 fi
 
@@ -74,7 +74,7 @@ echo "Aligning..."
 parallel -j "$t" --xapply "$EMAPATH align -1 {1} -2 {2} -r $r -o {1//}/$OUTSAM -R '$R'" \
                            ::: bucket0*/*1.preproc.fastq \
                            ::: bucket0*/*2.preproc.fastq
-bwa mem -t "$t" -M -R "${R//$'\t'/'\t'}" "$r" bucket_no_bc/*1.no_bc.fastq bucket_no_bc/*2.no_bc.fastq > "bucket_no_bc/$OUTSAM"
+bwa mem -t "$t" -M -R "'$R'" "$r" bucket_no_bc/*1.no_bc.fastq bucket_no_bc/*2.no_bc.fastq > "bucket_no_bc/$OUTSAM"
 
 echo "SAM -> sorted BAM..."
 parallel -j "$t" "samtools sort -m 5G -o {//}/$OUTBAM {}" ::: bucket*/$OUTSAM

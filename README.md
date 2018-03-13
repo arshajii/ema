@@ -45,7 +45,7 @@ align: choose best alignments based on barcodes
   -x: multi-input mode; takes input files after flags and spawns a thread for each
   -r <FASTA path>: indexed reference [required]
   -o <SAM file>: output SAM file [stdout]
-  -R <RG string>: full read group string (e.g. $'@RG\tID:foo\tSM:bar') [none]
+  -R <RG string>: full read group string (e.g. '@RG\tID:foo\tSM:bar') [none]
   -d: apply fragment read density optimization
   -p <platform>: sequencing platform (one of '10x', 'tru', 'cpt') [10x]
   -t <threads>: set number of threads [1]

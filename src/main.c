@@ -65,7 +65,9 @@ void read_fai(FILE *fai_file)
 
 static int validate_read_group(const char *rg)
 {
-	return strstr(rg, "@RG\t") == &rg[0] && strstr(rg, "ID:") != NULL;
+	return strstr(rg, "\t") == NULL &&
+	       strstr(rg, "@RG\t") == &rg[0] &&
+	       strstr(rg, "\tID:") != NULL;
 }
 
 static void print_help_and_exit(const char *argv0, int error)
@@ -99,7 +101,7 @@ static void print_help_and_exit(const char *argv0, int error)
 	P("  -x: multi-input mode; takes input files after flags and spawns a thread for each\n");
 	P("  -r <FASTA path>: indexed reference [required]\n");
 	P("  -o <SAM file>: output SAM file [stdout]\n");
-	P("  -R <RG string>: full read group string (e.g. $'@RG\\tID:foo\\tSM:bar') [none]\n");
+	P("  -R <RG string>: full read group string (e.g. '@RG\\tID:foo\\tSM:bar') [none]\n");
 	P("  -d: apply fragment read density optimization\n");
 	P("  -p <platform>: sequencing platform (one of '10x', 'tru', 'cpt') [10x]\n");
 	P("  -t <threads>: set number of threads [1]\n");
@@ -304,7 +306,7 @@ int main(const int argc, char *argv[])
 				out = strdup(optarg);
 				break;
 			case 'R':
-				rg  = strdup(optarg);
+				rg  = escape(strdup(optarg));
 				break;
 			case 'd':
 				apply_opt = 1;

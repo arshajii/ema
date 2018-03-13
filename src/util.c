@@ -1,6 +1,7 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <stdint.h>
+#include <string.h>
 #include <ctype.h>
 #include <math.h>
 #include <assert.h>
@@ -17,6 +18,24 @@ void copy_until_space(char *dest, char **src)
 
 	dest[i] = '\0';
 	(*src)++;  // skip the last space
+}
+
+char *escape(char *s)  // adapted from BWA
+{
+	char *p, *q;
+
+	for (p = q = s; *p; ++p) {
+		if (*p == '\\') {
+			++p;
+			if (*p == 't') *q++ = '\t';
+			else if (*p == 'n') *q++ = '\n';
+			else if (*p == 'r') *q++ = '\r';
+			else if (*p == '\\') *q++ = '\\';
+		} else *q++ = *p;
+	}
+	*q = '\0';
+
+	return s;
 }
 
 bc_t encode_bc(const char *bc)
