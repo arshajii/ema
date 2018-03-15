@@ -2,17 +2,15 @@ sudo: false
 language: generic
 compiler:
   - gcc
-  - clang
+  - g++
 addons:
   apt:
     sources:
     - ubuntu-toolchain-r-test
-    - llvm-toolchain-precise-3.8
     packages:
+    - gcc-6
     - g++-6
-    - clang-3.8
 install:
 - "[ $CXX = g++ ] && export CXX=g++-6 || true"
-- "[ $CXX = clang++ ] && export CXX=clang++-3.8 || true"
 script:
   - make CC=gcc-6 CXX=g++-6
