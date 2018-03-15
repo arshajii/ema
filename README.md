@@ -19,24 +19,18 @@ The `--recursive` flag is needed because EMA uses BWA's C API.
 Input FASTQs must first be preprocessed with `ema preproc` then sorted with `ema sort` (see below for more details).
 
 ```
-usage: ema <preproc|sort|count|align|help> [options]
+usage: ./ema <preproc|count|align|help> [options]
 
 preproc: preprocess barcoded FASTQ files
-  -1 <FASTQ1 path>: first FASTQ file [required]
-  -2 <FASTQ2 path>: second FASTQ file [none]
-  -w <whitelist path>: barcode whitelist [required]
-  -n <num buckets>: number of barcode buckets to make [20]
-  -c <counts file>: preexisting barcode counts [none]
+  -w <whitelist path>: specify whitelist [required]
+  -n <num buckets>: number of barcode buckets to make [500]
+  -h: apply Hamming-2 correction [off]
+  -o: <output directory> specify output directory [required]
+  -t <threads>: set number of threads [1]
 
-sort: sort preprocessed FASTQs by barcode
-  -1 <FASTQ1 path>: first FASTQ file [required]
-  -2 <FASTQ2 path>: second FASTQ file [required]
-
-count: performs preliminary barcode count
-  -1 <FASTQ1 path>: first FASTQ file [required]
-  -w <whitelist path>: barcode whitelist [required]
-  -i: indicates FASTQ is interleaved
-  -o <output file>: output file [stdout]
+count: performs preliminary barcode count (takes FASTQ via stdin)
+  -w <whitelist path>: specify barcode whitelist [required]
+  -o <output prefix>: specify output prefix [required]
 
 align: choose best alignments based on barcodes
   -1 <FASTQ1 path>: first (preprocessed and sorted) FASTQ file [required]
@@ -55,30 +49,7 @@ help: print this help message
 
 ### Preprocessing (10x only)
 
-**Note: A much faster preprocessor has been implemented. The method below still works, but will be substantially slower. Details are below**
-
-For large data sets, preprocessing can most easily be done as follows (assuming interleaved FASTQs):
-
-```
-cat data/*.fastq | ema count -1 - -w /path/to/whitelist.txt -i -o counts_file
-cat data/*.fastq | ema preproc -1 - -w /path/to/whitelist.txt -c counts_file
-```
-
-Then the FASTQs in each bucket (except the no-barcode bucket) must be sorted with `ema sort`:
-
-```
-ema sort -1 bucket000/*_1.fastq -2 bucket000/*_2.fastq
-ema sort -1 bucket001/*_1.fastq -2 bucket001/*_2.fastq
-...
-ema sort -1 bucket019/*_1.fastq -2 bucket019/*_2.fastq
-```
-
-Note that these can all be done in parallel (e.g. with [GNU Parallel](https://www.gnu.org/software/parallel/)).
-
-Instructions for preprocessing data from other sequencing platforms can be found [here](https://github.com/arshajii/ema-paper-data/blob/master/experiments.ipynb).
-
-#### Faster preprocessing 
-(Coming soon.)
+(TODO)
 
 ### Parallelism
 
