@@ -13,6 +13,7 @@
 #include <chrono>
 #include <string>
 #include <cstdlib>
+#include <unordered_map>
 
 #include <sys/types.h>
 #include <sys/stat.h>
@@ -86,6 +87,16 @@ inline size_t estimate_size(const std::map<K, V> &m)
 	const int overhead = 32;
 	return (sizeof(K) + sizeof(V) + overhead) * m.size();
 }
+
+template<typename K, typename V>
+inline size_t estimate_size(const std::unordered_map<K, V> &M) 
+{
+	size_t n = M.bucket_count();
+	float m = M.max_load_factor();
+	if (m > 1.0) n *= m;
+	return (M.size() * sizeof(V) + n * (sizeof(size_t) + sizeof(void*)));
+}
+
 
 inline auto stat_file(const std::string &path)
 {

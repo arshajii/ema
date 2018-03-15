@@ -63,25 +63,25 @@ double get_prob(char c)
 
 /******************************************************************************/
 
-void correct_barcode(int thread, int max_threads,
+void correct_barcode(int start, int end, int thread,
 	unordered_map<uint32_t, Count> &known_counts,
-	map<string, pair<uint32_t, int64_t>> &full_counts,
-	map<string, uint32_t> &final_corrected_counts,
+	vector<pair<string, pair<uint32_t, int64_t>>> &full_counts,
+	unordered_map<string, uint32_t> &final_corrected_counts,
 	vector<int64_t> &final_stats,
 	bool do_h2)
 {
 	auto T = cur_time();
 
-	map<string, uint32_t> corrected;
+	unordered_map<string, uint32_t> corrected;
 	vector<int64_t> stats(4, 0);
 
-	int64_t it_c = 0;
-	for (auto &it: full_counts) {
+	for (int ii = start; ii < end; ii++) {
 		/// TODO: better threading with std::map if it's possible at all
-		if (it_c++ % max_threads != thread) { 
-			continue;
-		}
+		//if (it_c++ % max_threads != thread) { 
+		//	continue;
+		//}
 
+		auto &it = full_counts[ii];
 		const string &q = it.first;
 		int64_t fc = it.second.second;
 
@@ -93,7 +93,6 @@ void correct_barcode(int thread, int max_threads,
 		// 	continue;
 		// }
 
-		
 		uint32_t barcode = 0;
 		it.second.first = 0; // Assign empty barcode
 		int ns = 0; // how many Ns?
@@ -188,11 +187,8 @@ void correct_barcode(int thread, int max_threads,
 		for (auto &x: corrected) {
 			final_corrected_counts[x.first] = x.second;
 		}
-		it_c = 0;
-		for (auto &c: full_counts) {
-			if (it_c++ % max_threads != thread) { 
-				continue;
-			}
+		for (int ii = start; ii < end; ii++) {
+			auto &c = full_counts[ii];
 			auto new_bcd = c.second.first;
 			if (new_bcd != 0) {
 				// assert(known_counts.find(new_bcd) != known_counts.end());
@@ -201,7 +197,7 @@ void correct_barcode(int thread, int max_threads,
 		}
 	}
 
-	eprn("  :: Thread {} took {} s", thread, elapsed(T));
+	eprn("  :: Thread {} from {:n} to {:n} took {} s", thread, start, end, elapsed(T));
 }
 
 /******************************************************************************/
@@ -228,7 +224,7 @@ void load_barcode_count(const string &path, unordered_map<uint32_t, Count> &coun
 
 void load_and_correct_full_count(const string &path, 
 	unordered_map<uint32_t, Count> &known_counts,
-	map<string, uint32_t> &corrected_counts,
+	unordered_map<string, uint32_t> &corrected_counts,
 	vector<int64_t> &stats,
 	bool do_h2,
 	const int nthreads)
@@ -244,24 +240,27 @@ void load_and_correct_full_count(const string &path,
 	while (fread(&total, 8, 1, f) == 1) {
 		auto T = cur_time();
 		
-		map<string, pair<uint32_t, int64_t>> full_counts;
+		vector<pair<string, pair<uint32_t, int64_t>>> full_counts;
+		full_counts.reserve(total);
 		while (total--) {
 			c = fread(&b[0], 1, BC_LEN, f);
 			assert(c == BC_LEN);
 			int64_t cnt;
 			c = fread(&cnt, 8, 1, f);
 			assert(c == 1);
-			full_counts[b].first = 0;
-			full_counts[b].second += cnt;
+			full_counts.push_back({b, {0, cnt}});
 		}
-		eprn("::: Loading dump {} done in {} s", ++dump, elapsed(T)); T = cur_time();
+		eprn("::: Loading dump {} of size {:n} ({:n} MB) done in {} s", ++dump, 
+			full_counts.size(), full_counts.size() * (sizeof(full_counts[0]) + 16) / MB, elapsed(T)); T = cur_time();
 
 		vector<thread> threads;
 
+		int nchunks = ceil(double(full_counts.size()) / nthreads);
 		for (int i = 0; i < nthreads; i++) {
 			threads.push_back(thread(
 				correct_barcode, 
-				i, nthreads,
+				i * nchunks, min(size_t(i + 1) * nchunks, full_counts.size()),
+				i, 
 				ref(known_counts), 
 				ref(full_counts), 
 				ref(corrected_counts),
@@ -273,7 +272,7 @@ void load_and_correct_full_count(const string &path,
 			t.join(); 
 		}
 		eprn("::: Correcting done in {} s", elapsed(T)); T = cur_time();
-		eprn("--> corrected counts size: {:n}", estimate_size(corrected_counts));
+		// eprn("--> corrected counts size: {:n}", estimate_size(corrected_counts));
 	}
 	fclose(f);
 }
@@ -322,7 +321,7 @@ EXTERNC void correct(
 	eprn(":: Loading known counts ... done in {:.1f} s", elapsed(T)); T = cur_time();
 
 /// 2. Load and correct full counts
-	map<string, uint32_t> corrected_counts;
+	unordered_map<string, uint32_t> corrected_counts;
 	vector<int64_t> stats(4, 0);
 	for (int fi = 0; fi < input_prefix_size; fi++) {
 		load_and_correct_full_count(
@@ -339,8 +338,7 @@ EXTERNC void correct(
 		 "       H1-corrected: {:n} \n"
 		 "       H2-corrected: {:n} ", 
 		 stats[NOCHANGE], stats[NOBUCKET], stats[H1CHANGE], stats[H2CHANGE]);
-	eprn(":: Corrected map size: {:n} MB", estimate_size(corrected_counts) / MB);
-	eprn(":: Corrected size: {:n}", corrected_counts.size());
+	eprn(":: Corrected map size: {:n} (~ {:n} MB)", corrected_counts.size(), estimate_size(corrected_counts) / MB);
 	eprn(":: Correcting barcodes ... done in {:.1f} s", elapsed(T)); T = cur_time();
 
 /// 3. Set up bucket boundaries
@@ -386,9 +384,9 @@ EXTERNC void correct(
 	}
 	eprn(":: File assignment ... done in {:.1f} s", elapsed(T)); T = cur_time();
 
-	for (int i = 0; i < files.size(); i++) {
-		eprn("{} -> {:n}", i, files[i].size);
-	}
+	// for (int i = 0; i < files.size(); i++) {
+	// 	eprn("{} -> {:n}", i, files[i].size);
+	// }
 	// exit(0);
 	
 /// 4. Write buckets
