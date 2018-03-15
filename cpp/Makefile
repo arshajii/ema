@@ -1,6 +1,6 @@
 CXX=g++
-CPPFLAGS=-c -std=c++14 -fdiagnostics-color -march=native 
-LDFLAGS=-lrt -pthread
+CPPFLAGS=-c -std=c++14 -fdiagnostics-color -march=native -pthread
+LDFLAGS=-pthread
 
 GIT_VERSION:=$(shell git describe --dirty --always --tags)
 SOURCES:=$(wildcard ./*.cc) 

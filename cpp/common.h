@@ -21,6 +21,12 @@
 
 /******************************************************************************/
 
+#ifdef __cplusplus
+#define EXTERNC extern "C"
+#else
+#define EXTERNC
+#endif
+
 #define prn(f, ...)    fmt::print(f "\n", ##__VA_ARGS__)
 #define prnn(...)      fmt::print(__VA_ARGS__)
 
@@ -49,6 +55,10 @@ const int BC_LEN = 16;
 const int ILLUMINA_QUAL_OFFSET = 33;
 const int QUAL_BASE = ILLUMINA_QUAL_OFFSET + 1;
 
+const size_t KB = 1024;
+const size_t MB = 1024 * KB;
+const size_t GB = 1024 * MB;
+
 /******************************************************************************/
 
 struct DNA {
@@ -68,22 +78,14 @@ inline char hash_dna(char c)
 	return dna_hash_lookup.val[c];
 }
 
-struct PhredProb {
-	double val[128];
-	constexpr PhredProb(): val()
-	{
-		for (int i = 0; i < 128; i++) {
-			val[i] = std::pow(10.0, - std::min(QUAL_BASE - 1, i) / 10.0);
-		}
-	}
-};
-constexpr auto phred_lookup = PhredProb();
-inline double get_prob(char c) 
-{
-	return phred_lookup.val[c];
-}
-
 /******************************************************************************/
+
+template<typename K, typename V>
+inline size_t estimate_size(const std::map<K, V> &m) 
+{
+	const int overhead = 32;
+	return (sizeof(K) + sizeof(V) + overhead) * m.size();
+}
 
 inline auto stat_file(const std::string &path)
 {
