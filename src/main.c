@@ -78,7 +78,7 @@ static void print_help_and_exit(const char *argv0, int error)
 #define P(...) fprintf(out, __VA_ARGS__)
 
 	FILE *out = error ? stderr : stdout;
-	P("usage: %s <preproc|sort|count|align|help> [options]\n", argv0);
+	P("usage: %s <preproc|count|align|help> [options]\n", argv0);
 	P("\n");
 	P("preproc: preprocess barcoded FASTQ files\n");
 	P("  -w <whitelist path>: specify whitelist [required]\n");
@@ -86,10 +86,6 @@ static void print_help_and_exit(const char *argv0, int error)
 	P("  -h: apply Hamming-2 correction [off]\n");
 	P("  -o: <output directory> specify output directory [required]\n");
 	P("  -t <threads>: set number of threads [1]\n");
-	P("\n");
-	P("sort: sort preprocessed FASTQs by barcode\n");
-	P("  -1 <fastq1 path>: specify first FASTQ file [required]\n");
-	P("  -2 <fastq2 path>: specify second FASTQ file [required]\n");
 	P("\n");
 	P("count: performs preliminary barcode count (takes FASTQ via stdin)\n");
 	P("  -w <whitelist path>: specify barcode whitelist [required]\n");
@@ -186,33 +182,6 @@ int main(const int argc, char *argv[])
 		}
 
 		correct(wl, inputs, n_inputs, out, do_h2, 10 * MB, NUM_THREADS, nbuckets);
-		return EXIT_SUCCESS;
-	}
-
-	if (EQ(mode, "sort")) {
-		char *fq1 = NULL;
-		char *fq2 = NULL;
-		char c;
-
-		while ((c = getopt(argc-1, &argv[1], "1:2:")) != -1) {
-			switch (c) {
-			case '1':
-				fq1 = strdup(optarg);
-				break;
-			case '2':
-				fq2 = strdup(optarg);
-				break;
-			default:
-				print_help_and_exit(argv0, 1);
-			}
-		}
-
-		if (fq1 == NULL || fq2 == NULL) {
-			fprintf(stderr, "error: specify paired-end FASTQs with -1 and -2\n");
-			exit(EXIT_FAILURE);
-		}
-
-		sort_fastq(fq1, fq2);
 		return EXIT_SUCCESS;
 	}
 
