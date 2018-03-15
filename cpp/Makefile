@@ -1,9 +1,5 @@
-CXX=g++
-CPPFLAGS=-c -std=c++14 -fdiagnostics-color -march=native -pthread
-LDFLAGS=-pthread
-
 GIT_VERSION:=$(shell git describe --dirty --always --tags)
-SOURCES:=$(wildcard ./*.cc) 
+SOURCES:=$(wildcard ./*.cc)
 OBJECTS:=$(SOURCES:.cc=.o)
 DEP := $(OBJECTS:.o=.d)
 
@@ -15,7 +11,7 @@ EXECUTABLE=ema-preprocess
 EXE=ema-preprocess
 
 all: CPPFLAGS+=-g -O2
-all: $(SOURCES) $(EXECUTABLE)
+all: $(SOURCES) $(OBJECTS)
 
 sanitize: CXX=g++
 sanitize: CPPFLAGS+= -g -O1 -fno-omit-frame-pointer -fsanitize=address
@@ -40,8 +36,8 @@ gprofile: LDFLAGS=-Wl,--no-as-needed,-lprofiler,--as-needed -ltcmalloc -lrt -lz 
 gprofile: CPPFLAGS+=-g -O2
 gprofile: $(SOURCES) $(EXECUTABLE)
 
-$(EXECUTABLE): $(OBJECTS)
-	$(CXX) $(OBJECTS) $(LDFLAGS) -o $(EXE)
+#$(EXECUTABLE): $(OBJECTS)
+#	$(CXX) $(OBJECTS) $(LDFLAGS) -o $(EXE)
 
 .cc.o:
 	$(CXX) $(CPPFLAGS) -DGITVER=\"$(GIT_VERSION)\" $< -o $@
@@ -49,4 +45,4 @@ $(EXECUTABLE): $(OBJECTS)
 -include $(DEP)
 
 clean:
-	rm -rf $(EXECUTABLE) $(OBJECTS) $(DEP)
+	rm -rf $(OBJECTS) $(DEP)

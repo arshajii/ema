@@ -23,5 +23,15 @@ extern PlatformProfile *tech;
 
 #define VERSION "0.1.0"
 
+#define KB 1024
+#define MB (1024 * KB)
+#define GB (1024 * MB)
+
+#ifdef __cplusplus
+#define EXTERNC extern "C"
+#else
+#define EXTERNC
+#endif
+
 #endif /* MAIN_H */
 

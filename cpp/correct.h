@@ -2,7 +2,7 @@
 
 /******************************************************************************/
 
-#pragma once 
+#pragma once
 
 /******************************************************************************/
 
@@ -11,7 +11,7 @@
  *
  * Parameters:
  *   known_barcodes_path: path for 10x known barcodes
- *   input_prefix:        list of all possible input prefixes 
+ *   input_prefix:        list of all possible input prefixes
  *                        (each prefix requires prefix.ema-fcnt and prefix.ema-ncnt files)
  *   input_prefix_size:   size of input_prefix array
  *   output_dir:          output directory for buckets (MUST EXIST)
@@ -22,12 +22,12 @@
  *   nbuckets:            how many buckets to create
  */
 EXTERNC void correct(
-	const char *known_barcodes_path, 
-	const char **input_prefix, 
+	const char *known_barcodes_path,
+	const char **input_prefix,
 	const int input_prefix_size,
-	const char *output_dir, 
+	const char *output_dir,
 	const char do_h2,
 	const size_t buffer_size,
-	const int nthreads, 
+	const int nthreads,
 	const int nbuckets
 );

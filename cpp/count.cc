@@ -34,15 +34,15 @@ void dump_map(map<string, int64_t> &full_counts, FILE *fo)
 /******************************************************************************/
 
 EXTERNC void count(
-	const char *known_barcodes_path, 
+	const char *known_barcodes_path,
 	const char *output_prefix,
-	const size_t max_map_size) 
-{	
+	const size_t max_map_size)
+{
 	auto TOT = cur_time();
 
 	unordered_map<uint32_t, int64_t> counts;
 	map<string, int64_t> full_counts;
-	
+
 	string s, q;
 
 	auto T = cur_time();
@@ -67,19 +67,19 @@ EXTERNC void count(
 	int64_t total_reads = 0;
 	int64_t nice_reads = 0;
 	int64_t sz = 0;
-	while (getline(cin, s)) { // N R1 Q1 R2 Q2		
+	while (getline(cin, s)) { // N R1 Q1 R2 Q2
 		sz += s.size() + 1;
-		getline(cin, s); sz += s.size() + 1; 
-		getline(cin, q); sz += q.size() + 1; 
-		getline(cin, q); sz += q.size() + 1; 
-		
+		getline(cin, s); sz += s.size() + 1;
+		getline(cin, q); sz += q.size() + 1;
+		getline(cin, q); sz += q.size() + 1;
+
 		bool has_n = 0;
 		barcode = 0;
 		DO(BC_LEN) { // 0..33 34..
 			if (s[_] == 'N') assert(q[_] == '#');
 			if (q[_] == '#') assert(s[_] == 'N');
 			assert(q[_] >= ILLUMINA_QUAL_OFFSET);
-			
+
 			b[_] = hash_dna(s[_]) * QUAL_BASE + min(QUAL_BASE - 1, q[_] - ILLUMINA_QUAL_OFFSET);
 			barcode = (barcode << 2) | hash_dna(s[_]);
 			has_n |= (s[_] == 'N');
@@ -91,7 +91,7 @@ EXTERNC void count(
 				nice_reads++;
 			}
 		}
-		
+
 		int cnt = full_counts[b]++;
 		if (!cnt && estimate_size(full_counts) >= max_map_size) { // new element
 			dump_map(full_counts, f_full);
@@ -102,7 +102,7 @@ EXTERNC void count(
 	}
 	eprn(":: Counting took {:.1f} s", elapsed(T)); T = cur_time();
 	eprn(":: Reads with OK barcode: {:n} out of {:n}", nice_reads, total_reads);
-	
+
 	int64_t tenx_buckets = 0;
 	for (auto &bcd: counts) if (bcd.second) {
 		tenx_buckets++;
@@ -121,7 +121,7 @@ EXTERNC void count(
 	fclose(f_full);
 	eprn(":: Printing took {:.1f} s", elapsed(T)); T = cur_time();
 
-	eprn(":: Processed {:n} reads ({:n} MB uncompressed) in {:n} s", 
-		total_reads, 
+	eprn(":: Processed {:n} reads ({:n} MB uncompressed) in {:n} s",
+		total_reads,
 		sz / (1024 * 1024), (int)elapsed(TOT));
 }

@@ -34,7 +34,7 @@ struct Count {
 	int64_t n_reads; // How many reads falling in here?
 	double prior;
 	int bucket; // Which bucket
-	
+
 	Count(): n_reads(0), bucket(0), prior(0) {}
 };
 
@@ -78,7 +78,7 @@ void correct_barcode(int thread, int max_threads,
 	int64_t it_c = 0;
 	for (auto &it: full_counts) {
 		/// TODO: better threading with std::map if it's possible at all
-		if (it_c++ % max_threads != thread) { 
+		if (it_c++ % max_threads != thread) {
 			continue;
 		}
 
@@ -93,7 +93,7 @@ void correct_barcode(int thread, int max_threads,
 		// 	continue;
 		// }
 
-		
+
 		uint32_t barcode = 0;
 		it.second.first = 0; // Assign empty barcode
 		int ns = 0; // how many Ns?
@@ -123,9 +123,9 @@ void correct_barcode(int thread, int max_threads,
 				for (int i2 = i1 + 1; i2 < BC_LEN; i2++) DOV(j2, 4) {
 					if (j2 == uint8_t(q[i2]) / QUAL_BASE)
 						continue;
-					uint32_t bcd = barcode 
-						& ~(3 << ((BC_LEN - i1 - 1) * 2)) 
-						& ~(3 << ((BC_LEN - i2 - 1) * 2)) 
+					uint32_t bcd = barcode
+						& ~(3 << ((BC_LEN - i1 - 1) * 2))
+						& ~(3 << ((BC_LEN - i2 - 1) * 2))
 						& ((1ll << (BC_LEN * 2)) - 1);
 					bcd |= (j1 << ((BC_LEN - i1 - 1) * 2));
 					bcd |= (j2 << ((BC_LEN - i2 - 1) * 2));
@@ -139,20 +139,20 @@ void correct_barcode(int thread, int max_threads,
 							max_p = p;
 							max_barcode = bcd;
 							type = H2CHANGE;
-						}							
+						}
 					}
 				}
 			}
 		} else if (ns <= 1) {
 			DOV(i, BC_LEN) {
-				if (ns && uint8_t(q[i]) % QUAL_BASE != 0) 
+				if (ns && uint8_t(q[i]) % QUAL_BASE != 0)
 					continue;
 				DOV(j, 4) {
 					if (ns == 0 && j == uint8_t(q[i]) / QUAL_BASE)
 						continue;
 					uint32_t bcd = barcode & ~(3 << ((BC_LEN - i - 1) * 2)) & ((1ll << (BC_LEN * 2)) - 1);
 					bcd |= (j << ((BC_LEN - i - 1) * 2));
-					
+
 					auto cit = known_counts.find(bcd);
 					if (cit != known_counts.end()) {
 						double p = cit->second.prior * get_prob(uint8_t(q[i]) % QUAL_BASE);
@@ -161,11 +161,11 @@ void correct_barcode(int thread, int max_threads,
 							max_p = p;
 							max_barcode = bcd;
 							type = H1CHANGE;
-						}							
+						}
 					}
 				}
 			}
-		} 
+		}
 
 		if (max_p / total > BC_CONF_THRESH) {
 			it.second.first = max_barcode;
@@ -190,7 +190,7 @@ void correct_barcode(int thread, int max_threads,
 		}
 		it_c = 0;
 		for (auto &c: full_counts) {
-			if (it_c++ % max_threads != thread) { 
+			if (it_c++ % max_threads != thread) {
 				continue;
 			}
 			auto new_bcd = c.second.first;
@@ -226,7 +226,7 @@ void load_barcode_count(const string &path, unordered_map<uint32_t, Count> &coun
 	fclose(f);
 }
 
-void load_and_correct_full_count(const string &path, 
+void load_and_correct_full_count(const string &path,
 	unordered_map<uint32_t, Count> &known_counts,
 	map<string, uint32_t> &corrected_counts,
 	vector<int64_t> &stats,
@@ -243,7 +243,7 @@ void load_and_correct_full_count(const string &path,
 	string b = string(BC_LEN, '#');
 	while (fread(&total, 8, 1, f) == 1) {
 		auto T = cur_time();
-		
+
 		map<string, pair<uint32_t, int64_t>> full_counts;
 		while (total--) {
 			c = fread(&b[0], 1, BC_LEN, f);
@@ -260,17 +260,17 @@ void load_and_correct_full_count(const string &path,
 
 		for (int i = 0; i < nthreads; i++) {
 			threads.push_back(thread(
-				correct_barcode, 
+				correct_barcode,
 				i, nthreads,
-				ref(known_counts), 
-				ref(full_counts), 
+				ref(known_counts),
+				ref(full_counts),
 				ref(corrected_counts),
 				ref(stats),
 				do_h2
 			));
 		}
 		for (auto &t: threads) {
-			t.join(); 
+			t.join();
 		}
 		eprn("::: Correcting done in {} s", elapsed(T)); T = cur_time();
 		eprn("--> corrected counts size: {:n}", estimate_size(corrected_counts));
@@ -282,20 +282,20 @@ void load_and_correct_full_count(const string &path,
 /******************************************************************************/
 
 EXTERNC void correct(
-	const char *known_barcodes_path, 
-	const char **input_prefix, 
+	const char *known_barcodes_path,
+	const char **input_prefix,
 	const int input_prefix_size,
-	const char *output_dir, 
+	const char *output_dir,
 	const char do_h2,
 	const size_t buffer_size,
-	const int nthreads, 
-	const int nbuckets) 
+	const int nthreads,
+	const int nbuckets)
 {
 	auto T = cur_time();
 	initialize_probs();
-	eprn(":: Bucketing {} inputs into {} files with {} threads", 
+	eprn(":: Bucketing {} inputs into {} files with {} threads",
 		input_prefix_size, nbuckets, nthreads);
-	
+
 /// 1. Load known counts
 	unordered_map<uint32_t, Count> known_counts;
 	string s, q, n, r;
@@ -326,10 +326,10 @@ EXTERNC void correct(
 	vector<int64_t> stats(4, 0);
 	for (int fi = 0; fi < input_prefix_size; fi++) {
 		load_and_correct_full_count(
-			fmt::format("{}.ema-fcnt", input_prefix[fi]), 
+			fmt::format("{}.ema-fcnt", input_prefix[fi]),
 			known_counts,
-			corrected_counts, 
-			stats, 
+			corrected_counts,
+			stats,
 			do_h2,
 			nthreads
 		);
@@ -337,7 +337,7 @@ EXTERNC void correct(
 	eprn(":: Stats: no change: {:n} \n"
 		 "         no barcode: {:n} \n"
 		 "       H1-corrected: {:n} \n"
-		 "       H2-corrected: {:n} ", 
+		 "       H2-corrected: {:n} ",
 		 stats[NOCHANGE], stats[NOBUCKET], stats[H1CHANGE], stats[H2CHANGE]);
 	eprn(":: Corrected map size: {:n} MB", estimate_size(corrected_counts) / MB);
 	eprn(":: Corrected size: {:n}", corrected_counts.size());
@@ -362,9 +362,9 @@ EXTERNC void correct(
 	assert(files.back().file != NULL);
 
 	// Have the smallest file at the top
-	auto PQComp = [&](int a, int b) { 
-		return tie(files[a].size, a) > tie(files[b].size, b); 
-	}; 
+	auto PQComp = [&](int a, int b) {
+		return tie(files[a].size, a) > tie(files[b].size, b);
+	};
 	priority_queue<int, vector<int>, decltype(PQComp)> pq(PQComp);
 	for (int i = 0; i < nbuckets; i++) {
 		files.push_back({
@@ -390,14 +390,14 @@ EXTERNC void correct(
 		eprn("{} -> {:n}", i, files[i].size);
 	}
 	// exit(0);
-	
+
 /// 4. Write buckets
 	char bcd[BC_LEN + 1];
 	bcd[BC_LEN] = 0;
 	string b = string(BC_LEN, '#');
 
 	// ifstream cin("../../ema/data/inter.fq");
-	while (getline(cin, n)) { 
+	while (getline(cin, n)) {
 		getline(cin, r);
 		getline(cin, q);
 		getline(cin, q);
@@ -409,13 +409,13 @@ EXTERNC void correct(
 			has_n |= (r[_] == 'N');
 			b[_] = hash_dna(r[_]) * QUAL_BASE + min(QUAL_BASE - 1, q[_] - ILLUMINA_QUAL_OFFSET);
 		}
-		
+
 		int fidx;
 		auto cit = corrected_counts.find(b);
 		if (cit != corrected_counts.end()) {
 			barcode = cit->second;
 			has_n = 0;
-		} 
+		}
 		auto kit = has_n ? known_counts.end() : known_counts.find(barcode);
 		if (kit != known_counts.end()) {
 			fidx = kit->second.bucket;
@@ -423,45 +423,45 @@ EXTERNC void correct(
 			barcode = 0;
 			fidx = 0;
 		}
-		
+
 		char *buff = files[fidx].buf;
 		size_t &buffi = files[fidx].buf_size;
 
 		// Barcode
 		if (barcode != 0) {
 			DO(BC_LEN) bcd[BC_LEN - _ - 1] = "ACGT"[barcode & 3], barcode >>= 2;
-			memcpy(buff + buffi, bcd, BC_LEN); 
+			memcpy(buff + buffi, bcd, BC_LEN);
 			buffi += BC_LEN;
 			buff[buffi++] = ' ';
 		}
 
 		// Name
 		for (auto c: n) {
-			if (isspace(c)) break; 
+			if (isspace(c)) break;
 			buff[buffi++] = c;
 		}
 		buff[buffi++] = ' ';
 
 		// Trimmed read
-		memcpy(buff + buffi, r.c_str() + BC_LEN + MATE1_TRIM, r.size() - BC_LEN - MATE1_TRIM); 
-		buffi += r.size() - BC_LEN - MATE1_TRIM;	
+		memcpy(buff + buffi, r.c_str() + BC_LEN + MATE1_TRIM, r.size() - BC_LEN - MATE1_TRIM);
+		buffi += r.size() - BC_LEN - MATE1_TRIM;
 		buff[buffi++] = ' ';
 
 		// Trimmed quality
-		memcpy(buff + buffi, q.c_str() + BC_LEN + MATE1_TRIM, q.size() - BC_LEN - MATE1_TRIM); 
+		memcpy(buff + buffi, q.c_str() + BC_LEN + MATE1_TRIM, q.size() - BC_LEN - MATE1_TRIM);
 		buffi += r.size() - BC_LEN - MATE1_TRIM;
 		buff[buffi++] = ' ';
-		
-		getline(cin, s); 
-		getline(cin, s); 
+
+		getline(cin, s);
+		getline(cin, s);
 		// Pair read
-		memcpy(buff + buffi, s.c_str(), s.size()); 
+		memcpy(buff + buffi, s.c_str(), s.size());
 		buffi += s.size();
 		buff[buffi++] = ' ';
-		getline(cin, s); 
-		getline(cin, s); 
+		getline(cin, s);
+		getline(cin, s);
 		// Pair quality
-		memcpy(buff + buffi, s.c_str(), s.size()); 
+		memcpy(buff + buffi, s.c_str(), s.size());
 		buffi += s.size();
 		buff[buffi++] = '\n';
 

@@ -2,7 +2,7 @@
 
 /******************************************************************************/
 
-#pragma once 
+#pragma once
 
 /******************************************************************************/
 
@@ -41,7 +41,7 @@
 #define dprnn(...)     { if(getenv("EMADBG")) fmt::print(stderr, __VA_ARGS__); }
 #endif
 
-#define cur_time()     chrono::high_resolution_clock::now() 
+#define cur_time()     chrono::high_resolution_clock::now()
 #define elapsed(t)     (chrono::duration_cast<chrono::milliseconds>(chrono::high_resolution_clock::now() - (t)).count() / 1000.00)
 
 #define DO(x) for(int _ = 0; _ < (x); _++)
@@ -81,7 +81,7 @@ inline char hash_dna(char c)
 /******************************************************************************/
 
 template<typename K, typename V>
-inline size_t estimate_size(const std::map<K, V> &m) 
+inline size_t estimate_size(const std::map<K, V> &m)
 {
 	const int overhead = 32;
 	return (sizeof(K) + sizeof(V) + overhead) * m.size();
