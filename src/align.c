@@ -191,16 +191,34 @@ void bwa_dealloc(void)
 	bwa_idx_destroy(ref);
 }
 
-/* caution: caller must ensure (fq1 != NULL && fq2 != NULL) ^ (fqx != NULL) */
-void find_clouds_and_align(FILE *fq1, FILE *fq2, FILE *fqx, FILE *out_file, const int apply_opt)
+void find_clouds_and_align(FILE *fq1,
+                           FILE *fq2,
+                           FILE *fqx,
+                           FILE *out_file,
+                           const int apply_opt,
+                           omp_lock_t *in_lock,
+                           omp_lock_t *out_lock)
 {
 #define STANDARD_FASTQ() (fqx == NULL)
 
-	omp_lock_t in_lock;
-	omp_lock_t out_lock;
+	assert((fq1 != NULL && fq2 != NULL) ^ (fqx != NULL));
 
-	omp_init_lock(&in_lock);
-	omp_init_lock(&out_lock);
+	omp_lock_t local_in_lock;
+	omp_lock_t local_out_lock;
+	int destroy_in_lock = 0;
+	int destroy_out_lock = 0;
+
+	if (in_lock == NULL) {
+		omp_init_lock(&local_in_lock);
+		in_lock = &local_in_lock;
+		destroy_in_lock = 1;
+	}
+
+	if (out_lock == NULL) {
+		omp_init_lock(&local_out_lock);
+		out_lock = &local_out_lock;
+		destroy_out_lock = 1;
+	}
 
 	fprintf(stderr, "Processing reads...\n");
 
@@ -286,7 +304,7 @@ void find_clouds_and_align(FILE *fq1, FILE *fq2, FILE *fqx, FILE *out_file, cons
 			int good;
 
 			{
-				omp_set_lock(&in_lock);
+				omp_set_lock(in_lock);
 				if (STANDARD_FASTQ()) {
 					if (fq1 != fq2)
 						good = (read_fastq_rec_bc_group(fq1, &start1, &fq1_recs, &n_fq1_recs, &fq1_recs_cap) |
@@ -312,7 +330,7 @@ void find_clouds_and_align(FILE *fq1, FILE *fq2, FILE *fqx, FILE *out_file, cons
 						done = 1;
 					}
 				}
-				omp_unset_lock(&in_lock);
+				omp_unset_lock(in_lock);
 			}
 
 			if (!good)
@@ -572,10 +590,10 @@ void find_clouds_and_align(FILE *fq1, FILE *fq2, FILE *fqx, FILE *out_file, cons
 					best_mate->visited = 1;
 
 				{
-					omp_set_lock(&out_lock);
+					omp_set_lock(out_lock);
 					print_sam_record(best, best_mate, out_file, rg_id);
 					print_sam_record(best_mate, best, out_file, rg_id);
-					omp_unset_lock(&out_lock);
+					omp_unset_lock(out_lock);
 				}
 			}
 
@@ -602,8 +620,8 @@ void find_clouds_and_align(FILE *fq1, FILE *fq2, FILE *fqx, FILE *out_file, cons
 	}
 
 	arena_destroy();
-	omp_destroy_lock(&in_lock);
-	omp_destroy_lock(&out_lock);
+	if (destroy_in_lock)  omp_destroy_lock(in_lock);
+	if (destroy_out_lock) omp_destroy_lock(out_lock);
 }
 
 static bc_t get_bc_direct(FASTQRecord *rec)

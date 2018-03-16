@@ -296,13 +296,14 @@ int main(const int argc, char *argv[])
 			exit(EXIT_FAILURE);
 		}
 
-		if (multi_input && out != NULL) {
-			fprintf(stderr, "warning: output file ignored in multi-input mode\n");
-		}
-
 		FILE *fq1_file = NULL;
 		FILE *fq2_file = NULL;
 		FILE *fqx_file = NULL;
+		FILE *out_file = (out == NULL ? stdout : fopen(out, "w"));
+
+		if (!out_file) {
+			IOERROR(out);
+		}
 
 		if (fqx != NULL) {
 			fqx_file = fopen(fqx, "r");
@@ -348,9 +349,6 @@ int main(const int argc, char *argv[])
 			num_threads_for_files = t;
 			num_threads_per_file  = 1;
 
-			if (out == NULL)
-				out = "";
-
 			const size_t n_inputs = argc - optind - 1;
 
 			if (n_inputs == 0) {
@@ -359,7 +357,6 @@ int main(const int argc, char *argv[])
 			}
 
 			FILE **inputs  = safe_malloc(n_inputs * sizeof(*inputs));
-			FILE **outputs = safe_malloc(n_inputs * sizeof(*outputs));
 
 			for (int i = optind + 1; i < argc; i++) {
 				const int j = i - (optind + 1);  // w.r.t. `inputs` and `outputs`
@@ -370,55 +367,31 @@ int main(const int argc, char *argv[])
 				if (!inputs[j]) {
 					IOERROR(filename);
 				}
-
-				// now we open the SAM file to write to
-#define SAM_EXT ".sam"
-				char *samfile = safe_malloc(strlen(out) + strlen(filename) + strlen(SAM_EXT) + 1);
-				strcpy(samfile, out);
-				strcat(samfile, filename);
-				char *ext = strrchr(samfile, '.');
-				if (ext != NULL) {
-					*ext = '\0';
-				}
-				strcat(samfile, SAM_EXT);
-#undef SAM_EXT
-
-				outputs[j] = fopen(samfile, "w");
-
-				if (!outputs[j]) {
-					IOERROR(samfile);
-				}
 			}
 
 			omp_set_nested(1);
+			omp_lock_t out_lock;
+			omp_init_lock(&out_lock);
 
 			#pragma omp parallel for num_threads(num_threads_for_files)
 			for (size_t i = 0; i < n_inputs; i++) {
-				find_clouds_and_align(NULL, NULL, inputs[i], outputs[i], apply_opt);
+				find_clouds_and_align(NULL, NULL, inputs[i], out_file, apply_opt, NULL, &out_lock);
 				fclose(inputs[i]);
-				fclose(outputs[i]);
 			}
 
 			free(inputs);
-			free(outputs);
 		} else {
 			num_threads_for_files = 1;
 			num_threads_per_file  = t;
 
-			FILE *out_file = (out == NULL ? stdout : fopen(out, "w"));
-
-			if (!out_file) {
-				IOERROR(out);
-			}
-
-			find_clouds_and_align(fq1_file, fq2_file, fqx_file, out_file, apply_opt);
+			find_clouds_and_align(fq1_file, fq2_file, fqx_file, out_file, apply_opt, NULL, NULL);
 
 			if (fq1_file) fclose(fq1_file);
 			if (fq2_file && fq2_file != fq1_file) fclose(fq2_file);
 			if (fqx_file) fclose(fqx_file);
-			fclose(out_file);
 		}
 
+		fclose(out_file);
 		bwa_dealloc();
 		free(fai);
 		free(chroms);

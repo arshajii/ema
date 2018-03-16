@@ -5,10 +5,18 @@
 #include <stdint.h>
 #include <stdio.h>
 
+#include <omp.h>
+
 void bwa_init(const char *ref_path);
 void bwa_dealloc(void);
 
-void find_clouds_and_align(FILE *fq1, FILE *fq2, FILE *fqx, FILE *out, const int apply_opt);
+void find_clouds_and_align(FILE *fq1,
+                           FILE *fq2,
+                           FILE *fqx,
+                           FILE *out_file,
+                           const int apply_opt,
+                           omp_lock_t *in_lock,
+                           omp_lock_t *out_lock);
 
 typedef struct cloud {
 	double exp_cov;
