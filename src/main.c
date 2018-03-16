@@ -375,7 +375,7 @@ int main(const int argc, char *argv[])
 
 				outputs[j] = fopen(samfile, "w");
 
-				if (!outputs) {
+				if (!outputs[j]) {
 					IOERROR(samfile);
 				}
 			}

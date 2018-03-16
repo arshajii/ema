@@ -770,6 +770,9 @@ static void read_special_fastq(FILE *fq, FASTQRecord **fq1_recs, FASTQRecord **f
 		copy_until_space(fq2->read, &p);
 		copy_until_space(fq2->qual, &p);
 
+		fq1->rlen = strlen(fq1->read);
+		fq2->rlen = strlen(fq2->read);
+
 		free(records[i]);
 	}
 
