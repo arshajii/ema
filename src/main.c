@@ -344,6 +344,7 @@ int main(const int argc, char *argv[])
 		read_fai(fai_file);
 		fclose(fai_file);
 		bwa_init(ref);
+		write_sam_header(out_file);
 
 		if (multi_input) {
 			num_threads_for_files = t;

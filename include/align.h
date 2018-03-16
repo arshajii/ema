@@ -10,6 +10,8 @@
 void bwa_init(const char *ref_path);
 void bwa_dealloc(void);
 
+void write_sam_header(FILE *out_file);
+
 void find_clouds_and_align(FILE *fq1,
                            FILE *fq2,
                            FILE *fqx,
