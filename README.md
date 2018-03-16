@@ -67,7 +67,7 @@ The different options can be combined: for example, specifying `-t T` _and_ `-x`
 Option 3 can be enabled by running a separate instance of EMA for each barcode bucket produced during preprocessing (this can also be used to sort the FASTQs with `ema sort`). A script using [GNU Parallel](https://www.gnu.org/software/parallel/) is provided in [`utils`](util/) and can be run as follows (in the same directory as the `bucket` folders):
 
 ```
-EMAPATH=/path/to/ema/executable PICARDPATH=/path/to/picard/jar ./ema_wrapper.sh
+EMAPATH=/path/to/ema/executable ./ema_wrapper.sh
 ```
 
 ### Output

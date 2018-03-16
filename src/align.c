@@ -68,7 +68,7 @@ static double mate_dist_penalty(const int64_t mate1_pos, const int64_t mate2_pos
 	}
 }
 
-/* name comparator for `SAMRecords`s */
+/* name comparator for `SAMRecord`s */
 static int name_cmp(const void *v1, const void *v2)
 {
 	SAMRecord **r1 = (SAMRecord **)v1;
@@ -80,6 +80,47 @@ static int name_cmp(const void *v1, const void *v2)
 	const int cmp2 = (m1 > m2) - (m1 < m2);
 
 	return (cmp1 != 0) ? cmp1 : cmp2;
+}
+
+/* duplicate comparator for `SAMRecord`s */
+static int dup_cmp(const void *v1, const void *v2)
+{
+	// we use the same duplicate definition as Lariat:
+	int cmp[6];
+
+	SAMRecord *r1 = *((SAMRecord **)v1);
+	SAMRecord *r2 = *((SAMRecord **)v2);
+	assert(r1->bc == r2->bc);
+
+	SAMRecord *mate1 = r1->selected_mate;
+	SAMRecord *mate2 = r2->selected_mate;
+
+	uint32_t m1 = r1->mate;
+	uint32_t m2 = r2->mate;
+	uint32_t rev1 = r1->rev;
+	uint32_t rev2 = r2->rev;
+	chrom_t c1 = r1->chrom;
+	chrom_t c2 = r2->chrom;
+	uint32_t p1 = r1->pos;
+	uint32_t p2 = r2->pos;
+	chrom_t mc1 = mate1 ? mate1->chrom : (chrom_t)-1;
+	chrom_t mc2 = mate2 ? mate2->chrom : (chrom_t)-1;
+	uint32_t mp1 = mate1 ? mate1->pos : (uint32_t)-1;
+	uint32_t mp2 = mate2 ? mate2->pos : (uint32_t)-1;
+
+	cmp[0] = (m1 > m2) - (m1 < m2);
+	cmp[1] = (rev1 > rev2) - (rev1 < rev2);
+	cmp[2] = (c1 > c2) - (c1 < c2);
+	cmp[3] = (p1 > p2) - (p1 < p2);
+	cmp[4] = (mc1 > mc2) - (mc1 < mc2);
+	cmp[5] = (mp1 > mp2) - (mp1 < mp2);
+
+	for (size_t i = 0; i < SIZE(cmp); i++) {
+		if (cmp[i] != 0)
+			return cmp[i];
+	}
+
+	return 0;
 }
 
 static void normalize_cloud_probabilities(Cloud *clouds, const size_t nc)
@@ -238,6 +279,9 @@ void find_clouds_and_align(FILE *fq1, FILE *fq2, FILE *fqx, FILE *out_file, cons
 		start1.id[0] = '\0';
 		start2.id[0] = '\0';
 
+		size_t n_records_final = 0;
+		SAMRecord **records_final = NULL;
+
 		while (1) {
 			int good;
 
@@ -281,6 +325,9 @@ void find_clouds_and_align(FILE *fq1, FILE *fq2, FILE *fqx, FILE *out_file, cons
 			for (size_t i = 0; i < n_fq1_recs; i++) {
 				append_alignments(ref, opts, &fq1_recs[i], &fq2_recs[i], &records, &n_records, &recs_cap);
 			}
+
+			n_records_final = 0;
+			records_final = safe_realloc(records_final, (n_fq1_recs + n_fq2_recs)*sizeof(*records_final));
 
 			qsort(records, n_records, sizeof(*records), record_cmp);
 			SAMRecord *record = &records[0];
@@ -477,35 +524,59 @@ void find_clouds_and_align(FILE *fq1, FILE *fq2, FILE *fqx, FILE *out_file, cons
 
 			while (e != NULL) {
 				if (!e->visited) {
-					struct xa alts1[MAX_ALTS];
-					struct xa alts2[MAX_ALTS];
-					size_t n_alts1 = 0;
-					size_t n_alts2 = 0;
 					SAMDictEnt *m = e->mate;
-					double best_gamma = 0.0;
-					double best_gamma_mate = 0.0;
-					Cloud *cloud1 = NULL;
-					Cloud *cloud2 = NULL;
-					SAMRecord *best = find_best_record(e, &best_gamma, &cloud1, alts1, &n_alts1);
-					SAMRecord *best_mate = (m != NULL) ? find_best_record(m, &best_gamma_mate, &cloud2, alts2, &n_alts2) : NULL;
+					SAMRecord *best = find_best_record(e);
+					SAMRecord *best_mate = (m != NULL) ? find_best_record(m) : NULL;
+
+					records_final[n_records_final++] = best;
+					best->selected_mate = best_mate;
+
+					if (best_mate != NULL) {
+						records_final[n_records_final++] = best_mate;
+						best_mate->selected_mate = best;
+					}
 
 					e->visited = 1;
 					if (m != NULL) {
 						m->visited = 1;
 						m->mate = NULL;
 					}
-
-					{
-						omp_set_lock(&out_lock);
-						print_sam_record(best, best_mate, best_gamma, cloud1, out_file, rg_id, alts1, n_alts1);
-						print_sam_record(best_mate, best, best_gamma_mate, cloud2, out_file, rg_id, alts2, n_alts2);
-						omp_unset_lock(&out_lock);
-					}
 				}
 
 				SAMDictEnt *t = e;
 				e = e->link_next;
 				sde_free(t);
+			}
+
+			if (!tech->many_clouds) {
+				qsort(records_final, n_records_final, sizeof(*records_final), dup_cmp);
+
+				for (size_t i = 0; i < n_records_final;) {
+					size_t j = i+1;
+					while (j < n_records_final && dup_cmp(&records_final[i], &records_final[j]) == 0) {
+						records_final[j]->duplicate = 1;
+						j++;
+					}
+					i = j;
+				}
+			}
+
+			for (size_t i = 0; i < n_records_final; i++) {
+				SAMRecord *best = records_final[i];
+				SAMRecord *best_mate = best->selected_mate;
+
+				if (best->visited)
+					continue;
+
+				if (best_mate != NULL)
+					best_mate->visited = 1;
+
+				{
+					omp_set_lock(&out_lock);
+					print_sam_record(best, best_mate, out_file, rg_id);
+					print_sam_record(best_mate, best, out_file, rg_id);
+					omp_unset_lock(&out_lock);
+				}
 			}
 
 			nc = 0;
@@ -517,6 +588,7 @@ void find_clouds_and_align(FILE *fq1, FILE *fq2, FILE *fqx, FILE *out_file, cons
 		free(clouds);
 		sam_dict_free(sd);
 		free(records);
+		free(records_final);
 
 		if (STANDARD_FASTQ()) {
 			free(fq1_recs);
@@ -843,10 +915,17 @@ static void alignment_to_sam_rec(FASTQRecord *fq,
 	s->unique = 0;
 	s->duplicate = 0;
 	s->active = 1;
+	s->visited = 0;
+
+	s->n_alts = 0;
+	s->gamma = 0;
+	s->cloud = NULL;
+
 	s->mate = mate;
 	s->rev = r->rev;
 	s->fq = fq;
 	s->fq_mate = fq_mate;
+	s->selected_mate = NULL;
 	s->aln = *r;
 }
 

@@ -103,14 +103,10 @@ static inline char rc(const char c)
 
 void print_sam_record(SAMRecord *rec,
                       SAMRecord *mate,
-                      double gamma,
-                      Cloud *cloud,
                       FILE *out,
-                      const char *rg_id,
-                      struct xa *alts,
-                      size_t n_alts)
+                      const char *rg_id)
 {
-	assert((rec != NULL || mate != NULL) && !isnan(gamma));
+	assert(rec != NULL || mate != NULL);
 	int flag = SAM_READ_PAIRED;
 	char *ident;
 	char *chrom = "*";
@@ -121,6 +117,11 @@ void print_sam_record(SAMRecord *rec,
 	SingleReadAlignment *r = NULL;
 	FASTQRecord *fq;
 
+	struct xa *alts = NULL;
+	size_t n_alts = 0;
+	double gamma = 0;
+	Cloud *cloud = 0;
+
 	if (rec != NULL) {
 		ident = rec->ident;
 		chrom = chrom_lookup(rec->chrom);
@@ -129,6 +130,13 @@ void print_sam_record(SAMRecord *rec,
 		bc = rec->bc;
 		r = &rec->aln;
 		fq = rec->fq;
+
+		alts = rec->alts;
+		n_alts = rec->n_alts;
+		gamma = rec->gamma;
+		cloud = rec->cloud;
+
+		assert(!isnan(gamma));
 
 		const int gamma_mapq = ((gamma <= 0.999999) ? (int)(-10*log10(1 - gamma)) : 60);
 		const int score_mapq = rec->score_mapq;
@@ -140,6 +148,9 @@ void print_sam_record(SAMRecord *rec,
 
 		if (rec->rev)
 			flag |= SAM_READ_REVERSED;
+
+		if (rec->duplicate)
+			flag |= SAM_READ_IS_A_DUP;
 
 		flag |= ((rec->mate == 0) ? SAM_1ST_IN_PAIR : SAM_2ND_IN_PAIR);
 	} else {
