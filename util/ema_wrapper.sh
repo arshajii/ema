@@ -4,7 +4,6 @@ set -o pipefail
 
 OUTSAM="ema_out.sam"
 OUTBAM="ema_out.sorted.bam"
-OUTBAM_NO_DUPS="ema_out.sorted.dupsmarked.bam"
 FINALBAM="ema_out.full.sorted.bam"
 
 SHORT=r:R:t:
@@ -13,11 +12,6 @@ LONG=ref:,rg:,threads:
 if [[ -z "$EMAPATH" ]]; then
     echo "error: must specify EMAPATH in environment"
     exit 1
-fi
-
-if [[ -z "$PICARDPATH" ]]; then
-    echo "error: must specify PICARDPATH in environment"
-    exit 2
 fi
 
 PARSED=$(getopt --options $SHORT --longoptions $LONG --name "$0" -- "$@")
@@ -80,11 +74,8 @@ echo "SAM -> sorted BAM..."
 parallel -j "$t" "samtools sort -m 5G -o {//}/$OUTBAM {}" ::: bucket*/$OUTSAM
 rm bucket*/*.sam
 
-echo "Removing duplicates..."
-parallel -j "$t" "java -Xmx10g -jar $PICARDPATH MarkDuplicates I={} O={//}/$OUTBAM_NO_DUPS M={//}/marked_dup_metrics.txt READ_ONE_BARCODE_TAG=BX READ_TWO_BARCODE_TAG=BX" ::: bucket*/$OUTBAM
-
 echo "BAM merge..."
-samtools merge -@ "$t" -f -c "$FINALBAM" bucket*/$OUTBAM_NO_DUPS
+samtools merge -@ "$t" -f -c "$FINALBAM" bucket*/$OUTBAM
 rm bucket*/*.bam
 
 echo "Indexing..."
