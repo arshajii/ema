@@ -348,6 +348,9 @@ int main(const int argc, char *argv[])
 			num_threads_for_files = t;
 			num_threads_per_file  = 1;
 
+			if (out == NULL)
+				out = "";
+
 			const size_t n_inputs = argc - optind - 1;
 
 			if (n_inputs == 0) {
@@ -370,8 +373,9 @@ int main(const int argc, char *argv[])
 
 				// now we open the SAM file to write to
 #define SAM_EXT ".sam"
-				char *samfile = safe_malloc(strlen(filename) + strlen(SAM_EXT) + 1);
-				strcpy(samfile, filename);
+				char *samfile = safe_malloc(strlen(out) + strlen(filename) + strlen(SAM_EXT) + 1);
+				strcpy(samfile, out);
+				strcat(samfile, filename);
 				char *ext = strrchr(samfile, '.');
 				if (ext != NULL) {
 					*ext = '\0';
