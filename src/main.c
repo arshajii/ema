@@ -17,7 +17,7 @@
 #include "main.h"
 
 int NUM_THREADS = 1;
-char *rg = NULL;
+char *rg = "@RG\tID:rg1\tSM:sample1";
 char **pg_argv = NULL;
 int pg_argc = 0;
 
