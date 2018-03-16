@@ -193,7 +193,6 @@ void bwa_dealloc(void)
 
 void write_sam_header(FILE *out_file)
 {
-	/* SAM header */
 	// HD
 	fprintf(out_file, "@HD\tVN:1.3\tSO:unsorted\n");
 
