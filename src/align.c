@@ -85,6 +85,7 @@ static int name_cmp(const void *v1, const void *v2)
 /* duplicate comparator for `SAMRecord`s */
 static int dup_cmp(const void *v1, const void *v2)
 {
+	// we use the same duplicate definition as Lariat:
 	int cmp[6];
 
 	SAMRecord *r1 = *((SAMRecord **)v1);
@@ -547,15 +548,17 @@ void find_clouds_and_align(FILE *fq1, FILE *fq2, FILE *fqx, FILE *out_file, cons
 				sde_free(t);
 			}
 
-			qsort(records_final, n_records_final, sizeof(*records_final), dup_cmp);
+			if (!tech->many_clouds) {
+				qsort(records_final, n_records_final, sizeof(*records_final), dup_cmp);
 
-			for (size_t i = 0; i < n_records_final;) {
-				size_t j = i+1;
-				while (j < n_records_final && dup_cmp(&records_final[i], &records_final[j]) == 0) {
-					records_final[j]->duplicate = 1;
-					j++;
+				for (size_t i = 0; i < n_records_final;) {
+					size_t j = i+1;
+					while (j < n_records_final && dup_cmp(&records_final[i], &records_final[j]) == 0) {
+						records_final[j]->duplicate = 1;
+						j++;
+					}
+					i = j;
 				}
-				i = j;
 			}
 
 			for (size_t i = 0; i < n_records_final; i++) {
