@@ -21,7 +21,8 @@
 #include "cpp/count.h"
 #include "cpp/correct.h"
 
-int NUM_THREADS = 1;
+int num_threads_per_file = 1;
+int num_threads_for_files = 1;
 char *rg = "@RG\tID:rg1\tSM:sample1";
 char **pg_argv = NULL;
 int pg_argc = 0;
@@ -133,6 +134,7 @@ int main(const int argc, char *argv[])
 		int nbuckets = 500;
 		int do_h2 = 0;
 		char *out = NULL;
+		int t = 1;
 		char c;
 
 		while ((c = getopt(argc-1, &argv[1], "w:n:ho:t:")) != -1) {
@@ -150,7 +152,7 @@ int main(const int argc, char *argv[])
 				out = strdup(optarg);
 				break;
 			case 't':
-				NUM_THREADS = atoi(optarg);
+				t = atoi(optarg);
 				break;
 			default:
 				print_help_and_exit(argv0, 1);
@@ -181,7 +183,7 @@ int main(const int argc, char *argv[])
 			inputs[j] = strdup(argv[i]);
 		}
 
-		correct(wl, inputs, n_inputs, out, do_h2, 10 * MB, NUM_THREADS, nbuckets);
+		correct(wl, inputs, n_inputs, out, do_h2, 10 * MB, t, nbuckets);
 		return EXIT_SUCCESS;
 	}
 
@@ -229,6 +231,7 @@ int main(const int argc, char *argv[])
 		int apply_opt = 0;
 		int multi_input = 0;
 		char *platform = "10x";
+		int t = 1;
 		char c;
 
 		while ((c = getopt(argc-1, &argv[1], "r:1:2:s:xo:R:dp:t:")) != -1) {
@@ -261,7 +264,7 @@ int main(const int argc, char *argv[])
 				platform = strdup(optarg);
 				break;
 			case 't':
-				NUM_THREADS = atoi(optarg);
+				t = atoi(optarg);
 				break;
 			default:
 				print_help_and_exit(argv0, 1);
@@ -342,6 +345,9 @@ int main(const int argc, char *argv[])
 		bwa_init(ref);
 
 		if (multi_input) {
+			num_threads_for_files = t;
+			num_threads_per_file  = 1;
+
 			const size_t n_inputs = argc - optind - 1;
 
 			if (n_inputs == 0) {
@@ -382,7 +388,7 @@ int main(const int argc, char *argv[])
 
 			omp_set_nested(1);
 
-			#pragma omp parallel for num_threads(n_inputs)
+			#pragma omp parallel for num_threads(num_threads_for_files)
 			for (size_t i = 0; i < n_inputs; i++) {
 				find_clouds_and_align(NULL, NULL, inputs[i], outputs[i], apply_opt);
 				fclose(inputs[i]);
@@ -392,6 +398,9 @@ int main(const int argc, char *argv[])
 			free(inputs);
 			free(outputs);
 		} else {
+			num_threads_for_files = 1;
+			num_threads_per_file  = t;
+
 			FILE *out_file = (out == NULL ? stdout : fopen(out, "w"));
 
 			if (!out_file) {

@@ -10,7 +10,8 @@ char *chrom_lookup(const chrom_t chrom);
 chrom_t chrom_index(const char *chrom);
 void read_fai(FILE *fai_file);
 
-extern int NUM_THREADS;
+extern int num_threads_per_file;
+extern int num_threads_for_files;
 extern char *rg;
 extern char **pg_argv;
 extern int pg_argc;

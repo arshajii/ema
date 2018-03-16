@@ -237,7 +237,7 @@ void find_clouds_and_align(FILE *fq1, FILE *fq2, FILE *fqx, FILE *out_file, cons
 	if (!STANDARD_FASTQ())
 		read_special_fastq(fqx, &fq1_recs_full, &fq2_recs_full);
 
-	#pragma omp parallel num_threads(NUM_THREADS)
+	#pragma omp parallel num_threads(num_threads_per_file)
 	{
 		arena_init();
 		size_t nc = 0;
