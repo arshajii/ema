@@ -295,7 +295,16 @@ EXTERNC void correct(
 	fin.close();
 
 	for (int fi = 0; fi < input_prefix_size; fi++) {
-		load_barcode_count(fmt::format("{}.ema-ncnt", input_prefix[fi]), known_counts);
+		string s = input_prefix[fi];
+		die_if(stat_dir(s) != 2, "{} is not a file", s);
+		// eprn("--> {}", s.substr(s.size() - 8));
+		die_if(s.size() < 9 || s.substr(s.size() - 9) != ".ema-ncnt", "{} is not an ema-ncnt file", s);
+		s[s.size() - 4] = 'f';
+		die_if(stat_dir(s) != 2, "{} is not a file", s);
+	}
+
+	for (int fi = 0; fi < input_prefix_size; fi++) {
+		load_barcode_count(fmt::format("{}", input_prefix[fi]), known_counts);
 	}
 	double total_counts = 0;
 	for (auto &c: known_counts) {
@@ -310,8 +319,10 @@ EXTERNC void correct(
 	unordered_map<string, uint32_t> corrected_counts;
 	vector<int64_t> stats(4, 0);
 	for (int fi = 0; fi < input_prefix_size; fi++) {
+		s = input_prefix[fi];
+		s[s.size() - 4] = 'f';
 		load_and_correct_full_count(
-			fmt::format("{}.ema-fcnt", input_prefix[fi]),
+			fmt::format("{}", s),
 			known_counts,
 			corrected_counts,
 			stats,
@@ -324,6 +335,7 @@ EXTERNC void correct(
 		 "       H1-corrected: {:n} \n"
 		 "       H2-corrected: {:n} ",
 		 stats[NOCHANGE], stats[NOBUCKET], stats[H1CHANGE], stats[H2CHANGE]);
+	size_t total = stats[NOCHANGE] + stats[NOBUCKET] + stats[H1CHANGE] + stats[H2CHANGE];
 	eprn(":: Corrected map size: {:n} (~ {:n} MB)", corrected_counts.size(), estimate_size(corrected_counts) / MB);
 	eprn(":: Correcting barcodes ... done in {:.1f} s", elapsed(T)); T = cur_time();
 
@@ -386,6 +398,7 @@ EXTERNC void correct(
 	string b = string(BC_LEN, '#');
 
 	// ifstream cin("../../ema/data/inter.fq");
+	size_t current = 0;
 	while (getline(cin, n)) {
 		getline(cin, r);
 		getline(cin, q);
@@ -485,7 +498,15 @@ EXTERNC void correct(
 			fwrite(buff, 1, buffi, files[fidx].file);
 			buffi = 0;
 		}
+
+		current++;
+		if (current % 1000000 == 0) {
+			double pct = double(current) * 100. / total;
+			eprnn("\r:: [{}] {:n} out of {:n} ({:.2f}%)",
+				string(pct / 2, '='), current, total, pct);
+		}
 	}
+	eprn("\r:: [{}] {:n} out of {:n} ({:.2f}%)", string(50, '='), current, total, 100.0);
 	for (int fidx = 0; fidx < files.size(); fidx++) {
 		fwrite(files[fidx].buf, 1, files[fidx].buf_size, files[fidx].file);
 		fclose(files[fidx].file);

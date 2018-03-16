@@ -109,5 +109,8 @@ inline int stat_dir(const std::string &path)
 	if (S_ISDIR(path_stat.st_mode)) {
 		return 1;
 	}
-	return 2;
+	if (S_ISREG(path_stat.st_mode)) {
+		return 2;
+	} 
+	return 3;
 }
