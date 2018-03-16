@@ -15,16 +15,16 @@ void dump_map(map<string, int64_t> &full_counts, FILE *fo)
 {
 	static int count = 0;
 
-	eprn("current map size: {:n}", estimate_size(full_counts));
+	// eprn("current map size: {:n}", estimate_size(full_counts));
 
 	int64_t total_buckets = full_counts.size();
 	size_t c = fwrite(&total_buckets, 8, 1, fo);
-	assert(c == 1);
+	die_if(c != 1, "fwrite failed");
 	for (auto &bcd: full_counts) {
 		c = fwrite(bcd.first.data(), 1, BC_LEN, fo);
-		assert(c == BC_LEN);
+		die_if(c != BC_LEN, "fwrite failed");
 		c = fwrite(&bcd.second, 8, 1, fo);
-		assert(c == 1);
+		die_if(c != 1, "fwrite failed");
 	}
 	fflush(fo);
 	full_counts.clear();
@@ -47,21 +47,21 @@ EXTERNC void count(
 
 	auto T = cur_time();
 	ifstream fin(known_barcodes_path);
-	assert(!fin.fail());
+	die_if(fin.fail(), "Cannot open file {}", known_barcodes_path);
 	uint32_t barcode;
 	while (getline(fin, s)) {
 		barcode = 0;
 		DO(BC_LEN) barcode = (barcode << 2) | hash_dna(s[_]);
-		assert(barcode != 0);
+		die_if(barcode == 0, "Invalid barcode AAA...AA whitelisted");
 		counts[barcode] = 0;
 	}
 	fin.close();
 	eprn(":: Loading 10X took {:.1f} s", elapsed(T)); T = cur_time();
 
 	FILE *f_full = fopen(fmt::format("{}.ema-fcnt", output_prefix).c_str(), "wb");
-	assert(f_full != NULL);
+	die_if(f_full == NULL, "Cannot open file {}", fmt::format("{}.ema-fcnt", output_prefix));
 	FILE *f_nice = fopen(fmt::format("{}.ema-ncnt", output_prefix).c_str(), "wb");
-	assert(f_nice != NULL);
+	die_if(f_nice == NULL, "Cannot open file {}", fmt::format("{}.ema-ncnt", output_prefix));
 
 	string b = string(BC_LEN, '#');
 	int64_t total_reads = 0;
@@ -76,9 +76,9 @@ EXTERNC void count(
 		bool has_n = 0;
 		barcode = 0;
 		DO(BC_LEN) { // 0..33 34..
-			if (s[_] == 'N') assert(q[_] == '#');
-			if (q[_] == '#') assert(s[_] == 'N');
-			assert(q[_] >= ILLUMINA_QUAL_OFFSET);
+			die_if((s[_] == 'N' && q[_] != '#') || (s[_] != 'N' && q[_] == '#'), 
+				"# quality score does not match N ({} vs. {})", s[_], q[_]);
+			die_if(q[_] < ILLUMINA_QUAL_OFFSET, "Quality score less than {}", ILLUMINA_QUAL_OFFSET);
 
 			b[_] = hash_dna(s[_]) * QUAL_BASE + min(QUAL_BASE - 1, q[_] - ILLUMINA_QUAL_OFFSET);
 			barcode = (barcode << 2) | hash_dna(s[_]);
@@ -108,12 +108,12 @@ EXTERNC void count(
 		tenx_buckets++;
 	}
 	size_t c = fwrite(&tenx_buckets, 8, 1, f_nice);
-	assert(c == 1);
+	die_if(c != 1, "fwrite failed");
 	for (auto &bcd: counts) if (bcd.second) {
 		c = fwrite(&bcd.first, 4, 1, f_nice);
-		assert(c == 1);
+		die_if(c != 1, "fwrite failed");
 		c = fwrite(&bcd.second, 8, 1, f_nice);
-		assert(c == 1);
+		die_if(c != 1, "fwrite failed");
 	}
 	fclose(f_nice);
 

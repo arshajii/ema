@@ -1,12 +1,12 @@
 TARGET = ema
 LIBS = -L$(BWADIR) -lbwa -lm -lz -lpthread
 CC = gcc
-WARNINGS = -Wall -Wextra -Werror
+WARNINGS = -Wall -Wextra
 CFLAGS = -std=gnu99 -march=native -O3 -fopenmp -flto -fstrict-aliasing $(WARNINGS)
 LFLAGS = -lstdc++ -march=native -O3 -flto -fopenmp -lpthread
 
 CXX = g++
-CPPFLAGS = -c -std=c++14 -fdiagnostics-color -march=native -pthread
+CPPFLAGS = -c -std=c++14 -O3 -march=native -pthread
 LDFLAGS = -pthread
 
 #CFLAGS = -std=gnu99 -fstrict-aliasing -fopenmp -ggdb -O0 $(WARNINGS)

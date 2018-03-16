@@ -76,22 +76,9 @@ void correct_barcode(int start, int end, int thread,
 	vector<int64_t> stats(4, 0);
 
 	for (int ii = start; ii < end; ii++) {
-		/// TODO: better threading with std::map if it's possible at all
-		//if (it_c++ % max_threads != thread) {
-		//	continue;
-		//}
-
 		auto &it = full_counts[ii];
 		const string &q = it.first;
 		int64_t fc = it.second.second;
-
-		// Is it already corrected?
-		// auto itt = corrected_counts.find(q);
-		// if (itt != corrected_counts.end()) {
-		// 	it.second.first = itt->second.first;
-		// 	stats[itt->second.second] += fc;
-		// 	continue;
-		// }
 
 		uint32_t barcode = 0;
 		it.second.first = 0; // Assign empty barcode
@@ -191,7 +178,6 @@ void correct_barcode(int start, int end, int thread,
 			auto &c = full_counts[ii];
 			auto new_bcd = c.second.first;
 			if (new_bcd != 0) {
-				// assert(known_counts.find(new_bcd) != known_counts.end());
 				known_counts[new_bcd].n_reads += c.second.second;
 			}
 		}
@@ -206,17 +192,17 @@ void load_barcode_count(const string &path, unordered_map<uint32_t, Count> &coun
 {
 	eprn(":: Loading known counts file {} ... ", path);
 	FILE *f = fopen(path.c_str(), "rb");
-	assert(f != NULL);
+	die_if(f == NULL, "Cannot open file {}", path);
 	int64_t total;
 	size_t c = fread(&total, 8, 1, f);
-	assert(c == 1);
+	die_if(c != 1, "fread failed (corrupted input?)");
 	while (total--) {
 		uint32_t bcd;
 		c = fread(&bcd, 4, 1, f);
-		assert(c == 1);
+		die_if(c != 1, "fread failed (corrupted input?)");
 		int64_t cnt;
 		c = fread(&cnt, 8, 1, f);
-		assert(c == 1);
+		die_if(c != 1, "fread failed (corrupted input?)");
 		counts[bcd].prior += cnt;
 	}
 	fclose(f);
@@ -232,7 +218,7 @@ void load_and_correct_full_count(const string &path,
 	eprn(":: Loading full counts file {} ... ", path);
 
 	FILE *f = fopen(path.c_str(), "rb");
-	assert(f != NULL);
+	die_if(f == NULL, "Cannot open file {}", path);
 
 	int64_t total, dump = 0;
 	size_t c;
@@ -244,10 +230,10 @@ void load_and_correct_full_count(const string &path,
 		full_counts.reserve(total);
 		while (total--) {
 			c = fread(&b[0], 1, BC_LEN, f);
-			assert(c == BC_LEN);
+			die_if(c != BC_LEN, "fread failed (corrupted input?)");
 			int64_t cnt;
 			c = fread(&cnt, 8, 1, f);
-			assert(c == 1);
+			die_if(c != 1, "fread failed (corrupted input?)");
 			full_counts.push_back({b, {0, cnt}});
 		}
 		eprn("::: Loading dump {} of size {:n} ({:n} MB) done in {} s", ++dump,
@@ -299,11 +285,11 @@ EXTERNC void correct(
 	unordered_map<uint32_t, Count> known_counts;
 	string s, q, n, r;
 	ifstream fin(known_barcodes_path);
-	assert(!fin.fail());
+	die_if(fin.fail(), "Cannot open file {}", known_barcodes_path);
 	while (getline(fin, s)) {
 		uint32_t barcode = 0;
 		DO(BC_LEN) barcode = (barcode << 2) | hash_dna(s[_]);
-		assert(barcode != 0);
+		die_if(barcode == 0, "Invalid barcode AAA...AA whitelisted");
 		known_counts[barcode].prior = 0;
 	}
 	fin.close();
@@ -343,7 +329,12 @@ EXTERNC void correct(
 
 /// 3. Set up bucket boundaries
 	// 3a. Create file handles and buffers
-	assert(S_ISDIR(stat_file(output_dir)));
+	int de = stat_dir(output_dir);
+	die_if(de == 2, "{} exists but is not a directory", output_dir);
+	if (de == 0) {
+		int de = mkdir(output_dir, S_IRWXU | S_IRWXG | S_IROTH | S_IXOTH);
+		die_if(de == -1, "Cannot create directory {}", output_dir);
+	}
 	struct PQFile {
 		int64_t size; // current size
 		FILE *file;
@@ -356,8 +347,8 @@ EXTERNC void correct(
 		.buf = (char*)malloc(buffer_size + 10 * KB),
 		.buf_size = 0
 	}};
-	assert(files.back().buf != NULL);
-	assert(files.back().file != NULL);
+	die_if(files.back().buf == NULL, "Cannot allocate memory");
+	die_if(files.back().file == NULL, "Cannot open file {}", fmt::format("{}/ema-bin-nobc", output_dir));
 
 	// Have the smallest file at the top
 	auto PQComp = [&](int a, int b) {
@@ -371,8 +362,8 @@ EXTERNC void correct(
 			.buf = (char*)malloc(buffer_size + 10 * KB),
 			.buf_size = 0
 		});
-		assert(files.back().buf != NULL);
-		assert(files.back().file != NULL);
+		die_if(files.back().buf == NULL, "Cannot allocate memory");
+		die_if(files.back().file == NULL, "Cannot open file {}", fmt::format("{}/ema-bin-{:03}", output_dir, i));
 		pq.push(files.size() - 1);
 	}
 	/// 3b. Bucket the barcodes
@@ -438,24 +429,51 @@ EXTERNC void correct(
 			if (isspace(c)) break;
 			buff[buffi++] = c;
 		}
-		buff[buffi++] = ' ';
+		if (fidx) {
+			buff[buffi++] = ' ';
+		} else {
+			buff[buffi++] = '\n';
+		}
 
 		// Trimmed read
 		memcpy(buff + buffi, r.c_str() + BC_LEN + MATE1_TRIM, r.size() - BC_LEN - MATE1_TRIM);
 		buffi += r.size() - BC_LEN - MATE1_TRIM;
-		buff[buffi++] = ' ';
+		if (fidx) {
+			buff[buffi++] = ' ';
+		} else {
+			buff[buffi++] = '\n';
+			buff[buffi++] = '+';
+			buff[buffi++] = '\n';
+		}
 
 		// Trimmed quality
 		memcpy(buff + buffi, q.c_str() + BC_LEN + MATE1_TRIM, q.size() - BC_LEN - MATE1_TRIM);
 		buffi += r.size() - BC_LEN - MATE1_TRIM;
-		buff[buffi++] = ' ';
+		if (fidx) {
+			buff[buffi++] = ' ';
+		} else {
+			buff[buffi++] = '\n';
+		}
 
 		getline(cin, s);
+		if (!fidx) {
+			for (auto c: s) {
+				if (isspace(c)) break;
+				buff[buffi++] = c;
+			}
+			buff[buffi++] = '\n';
+		}
 		getline(cin, s);
 		// Pair read
 		memcpy(buff + buffi, s.c_str(), s.size());
 		buffi += s.size();
-		buff[buffi++] = ' ';
+		if (fidx) {
+			buff[buffi++] = ' ';
+		} else {
+			buff[buffi++] = '\n';
+			buff[buffi++] = '+';
+			buff[buffi++] = '\n';
+		}
 		getline(cin, s);
 		getline(cin, s);
 		// Pair quality

@@ -34,6 +34,8 @@
 #define eprn(f, ...)   fmt::print(stderr, f "\n",  ##__VA_ARGS__)
 #define eprnn(...)     fmt::print(stderr, __VA_ARGS__)
 
+#define die_if(Q, f, ...)  if (Q) { fmt::print(stderr, f "---exiting!\n",  ##__VA_ARGS__) ; exit(1); }
+
 #ifdef NDEBUG
 #define dprn(f, ...)   ;
 #define dprnn(...)     ;
@@ -97,11 +99,15 @@ inline size_t estimate_size(const std::unordered_map<K, V> &M)
 	return (M.size() * sizeof(V) + n * (sizeof(size_t) + sizeof(void*)));
 }
 
-
-inline auto stat_file(const std::string &path)
+inline int stat_dir(const std::string &path)
 {
 	struct stat path_stat;
 	int s = stat(path.c_str(), &path_stat);
-	assert(s == 0);
-	return path_stat.st_mode;
+	if (s != 0) {
+		return 0;
+	}
+	if (S_ISDIR(path_stat.st_mode)) {
+		return 1;
+	}
+	return 2;
 }
