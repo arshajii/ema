@@ -379,6 +379,7 @@ int main(const int argc, char *argv[])
 				fclose(inputs[i]);
 			}
 
+			omp_destroy_lock(&out_lock);
 			free(inputs);
 		} else {
 			num_threads_for_files = 1;
