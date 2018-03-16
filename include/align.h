@@ -67,7 +67,7 @@ int is_pair_relaxed(struct sam_record *r1, struct sam_record *r2);
 #define SPLIT_CLIP_THRESH        15
 
 #define SECONDARY_ALIGN_THRESH 0.9
-#define MAX_ALTS 15
+#define MAX_ALTS 3
 
 #endif /* ALIGN_H */
 

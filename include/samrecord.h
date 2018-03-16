@@ -40,9 +40,16 @@ typedef struct sam_record {
 	uint32_t duplicate   : 1;
 	uint32_t unique      : 1;
 	uint32_t active      : 1;
+	uint32_t visited     : 1;
+
+	struct xa alts[MAX_ALTS];
+	size_t n_alts;
+	double gamma;
+	Cloud *cloud;
 
 	FASTQRecord *fq;
 	FASTQRecord *fq_mate;
+	struct sam_record *selected_mate;
 	SingleReadAlignment aln;
 } SAMRecord;
 
@@ -55,12 +62,8 @@ int record_cmp(const void *v1, const void *v2);
 struct xa;
 void print_sam_record(SAMRecord *rec,
                       SAMRecord *mate,
-                      double gamma,
-                      Cloud *cloud,
                       FILE *out,
-                      const char *rg_id,
-                      struct xa *alts,
-                      size_t n_alts);
+                      const char *rg_id);
 
 /* SAM specs */
 #define SAM_NUM_FIELDS 11

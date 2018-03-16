@@ -44,7 +44,7 @@ void sam_dict_free(SAMDict *sd);
 int sam_dict_add(SAMDict *sd, SAMRecord *k, Cloud *v, const int force);
 void sam_dict_del(SAMDict *sd, SAMRecord *k);
 void sam_dict_clear(SAMDict *sd);
-SAMRecord *find_best_record(SAMDictEnt *e, double *gamma, Cloud **cloud, struct xa *alt, size_t *n_alts);
+SAMRecord *find_best_record(SAMDictEnt *e);
 
 #endif /* SAMDICT_H */
 
