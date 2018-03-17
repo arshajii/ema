@@ -67,7 +67,7 @@ In this guide, we use the following additional tools:
 - [samtools](https://github.com/samtools/samtools)
 - [GNU Parallel](https://www.gnu.org/software/parallel/)
 
-We also use a 10x barcode whitelist, which can be found [here](http://ema.csail.mit.edu).
+We also use a 10x barcode whitelist, which can be found [here](http://cb.csail.mit.edu/cb/ema/data/4M-with-alts-february-2016.txt).
 
 #### Preprocessing
 Preprocessing 10x data entails several steps, the first of which is counting barcodes (`-j` specifies the number of jobs to be spawned by `parallel`):
