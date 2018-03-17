@@ -17,7 +17,7 @@ The `--recursive` flag is needed because EMA uses BWA's C API.
 
 ### Usage
 ```
-usage: ./ema <count|preproc|align|help> [options]
+usage: ema <count|preproc|align|help> [options]
 
 count: perform preliminary barcode count (takes interleaved FASTQ via stdin)
   -w <whitelist path>: specify barcode whitelist [required]
@@ -105,13 +105,13 @@ paste <(pigz -c -d *_R1_*.gz | paste - - - -) <(pigz -c -d *_R2_*.gz | paste - -
 #### Mapping
 First we map each barcode bin with EMA. Here, we'll do this using a combination of GNU Parallel and EMA's internal multithreading, which we found to be optimal due to the runtime/memory trade-off. In the following, for instance, we use 10 jobs each with 4 threads (for 40 total threads). We also pipe EMA's SAM output (stdout by default) to `samtools sort`, which produces a sorted BAM:
 
-```
+```bash
 parallel --bar -j10 "ema align -t 4 -d -r /path/to/ref.fa -s {} | samtools sort -@ 4 -O bam -l 0 -m 4G -o {}.bam -"
 ```
 
 Lastly, we map the no-barcode bin with BWA:
 
-```
+```bash
 bwa mem -p -t 40 -M -R "@RG\tID:rg1\tSM:sample1" /path/to/ref.fa output_dir/ema-bin-nobc | samtools sort -@ 4 -O bam -l 0 -m 4G -o output_dir/ema-bin-nobc.bam
 ```
 
@@ -120,14 +120,14 @@ Note that `@RG\tID:rg1\tSM:sample1` is EMA's default read group. If you specify 
 #### Postprocessing
 EMA performs duplicate marking automatically. We mark duplicates on BWA's output with `sambamba markdup`:
 
-```
+```bash
 sambamba markdup -t 40 -p -l 0 output_dir/ema-bin-nobc.bam output_dir/ema-bin-nobc-dupsmarked.bam
 rm output_dir/ema-bin-nobc.bam
 ```
 
 Now we merge all BAMs into a single BAM (might require modifying `ulimit`s, as in `ulimit -n 10000`):
 
-```
+```bash
 sambamba merge -t 40 -p ema_final.bam output_dir/*.bam
 ```
 
