@@ -112,7 +112,8 @@ parallel --bar -j10 "ema align -t 4 -d -r /path/to/ref.fa -s {} | samtools sort 
 Lastly, we map the no-barcode bin with BWA:
 
 ```bash
-bwa mem -p -t 40 -M -R "@RG\tID:rg1\tSM:sample1" /path/to/ref.fa output_dir/ema-bin-nobc | samtools sort -@ 4 -O bam -l 0 -m 4G -o output_dir/ema-bin-nobc.bam
+bwa mem -p -t 40 -M -R "@RG\tID:rg1\tSM:sample1" /path/to/ref.fa output_dir/ema-bin-nobc |\
+  samtools sort -@ 4 -O bam -l 0 -m 4G -o output_dir/ema-bin-nobc.bam
 ```
 
 Note that `@RG\tID:rg1\tSM:sample1` is EMA's default read group. If you specify another for EMA, be sure to specify the same for BWA as well (both tools take the full read group string via `-R`).
