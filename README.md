@@ -70,7 +70,7 @@ In this guide, we use the following additional tools:
 We also use a 10x barcode whitelist, which can be found [here](http://ema.csail.mit.edu).
 
 #### Preprocessing
-Preprocessing 10x data entails several steps, the first of which is counting barcodes:
+Preprocessing 10x data entails several steps, the first of which is counting barcodes (`-j` specifies the number of jobs to be spawned by `parallel`):
 
 ```
 cd /path/to/gzipped_fastqs/
