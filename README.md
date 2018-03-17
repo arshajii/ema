@@ -78,7 +78,7 @@ parallel -j40 --bar 'pigz -c -d {} | \
   ema count -w /path/to/whitelist.txt -o {/.} 2>{/.}.log' ::: *.gz
 ```
 
-Make sure that only the FASTQs **are interleaved** and containing the actual reads are included in `*.gz` above (as opposed to sample indices, typically with `_I1_` in their filenames). This will produce `*.ema-ncnt` and `*.ema-fcnt` files, containing the count data.
+Make sure that the FASTQs **are interleaved** and **only contain the actual reads**  in `*.gz`s above (as opposed to sample indices, typically with `_I1_` in their filenames). This will produce `*.ema-ncnt` and `*.ema-fcnt` files, containing the count data.
 
 If you do not have interleaved files, you can interleave them as follows:
 
