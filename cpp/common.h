@@ -2,7 +2,7 @@
 
 /******************************************************************************/
 
-#pragma once 
+#pragma once
 
 /******************************************************************************/
 
@@ -34,6 +34,8 @@
 #define eprn(f, ...)   fmt::print(stderr, f "\n",  ##__VA_ARGS__)
 #define eprnn(...)     fmt::print(stderr, __VA_ARGS__)
 
+#define die_if(Q, f, ...)  if (Q) { fmt::print(stderr, f "---exiting!\n",  ##__VA_ARGS__) ; exit(1); }
+
 #ifdef NDEBUG
 #define dprn(f, ...)   ;
 #define dprnn(...)     ;
@@ -42,7 +44,7 @@
 #define dprnn(...)     { if(getenv("EMADBG")) fmt::print(stderr, __VA_ARGS__); }
 #endif
 
-#define cur_time()     chrono::high_resolution_clock::now() 
+#define cur_time()     chrono::high_resolution_clock::now()
 #define elapsed(t)     (chrono::duration_cast<chrono::milliseconds>(chrono::high_resolution_clock::now() - (t)).count() / 1000.00)
 
 #define DO(x) for(int _ = 0; _ < (x); _++)
@@ -82,7 +84,7 @@ inline char hash_dna(char c)
 /******************************************************************************/
 
 template<typename K, typename V>
-inline size_t estimate_size(const std::map<K, V> &m) 
+inline size_t estimate_size(const std::map<K, V> &m)
 {
 	const int overhead = 32;
 	return (sizeof(K) + sizeof(V) + overhead) * m.size();
@@ -97,11 +99,18 @@ inline size_t estimate_size(const std::unordered_map<K, V> &M)
 	return (M.size() * sizeof(V) + n * (sizeof(size_t) + sizeof(void*)));
 }
 
-
-inline auto stat_file(const std::string &path)
+inline int stat_dir(const std::string &path)
 {
 	struct stat path_stat;
 	int s = stat(path.c_str(), &path_stat);
-	assert(s == 0);
-	return path_stat.st_mode;
+	if (s != 0) {
+		return 0;
+	}
+	if (S_ISDIR(path_stat.st_mode)) {
+		return 1;
+	}
+	if (S_ISREG(path_stat.st_mode)) {
+		return 2;
+	} 
+	return 3;
 }

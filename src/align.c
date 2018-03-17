@@ -191,20 +191,8 @@ void bwa_dealloc(void)
 	bwa_idx_destroy(ref);
 }
 
-/* caution: caller must ensure (fq1 != NULL && fq2 != NULL) ^ (fqx != NULL) */
-void find_clouds_and_align(FILE *fq1, FILE *fq2, FILE *fqx, FILE *out_file, const int apply_opt)
+void write_sam_header(FILE *out_file)
 {
-#define STANDARD_FASTQ() (fqx == NULL)
-
-	omp_lock_t in_lock;
-	omp_lock_t out_lock;
-
-	omp_init_lock(&in_lock);
-	omp_init_lock(&out_lock);
-
-	fprintf(stderr, "Processing reads...\n");
-
-	/* SAM header */
 	// HD
 	fprintf(out_file, "@HD\tVN:1.3\tSO:unsorted\n");
 
@@ -216,13 +204,44 @@ void find_clouds_and_align(FILE *fq1, FILE *fq2, FILE *fqx, FILE *out_file, cons
 	// RG
 	if (rg != NULL)
 		fprintf(out_file, "%s\n", rg);
-	const char *rg_id = (rg != NULL) ? (strstr(rg, "ID:") + 3) : NULL;  // pre-validated
 
 	// PG
 	fprintf(out_file, "@PG\tID:ema\tPN:ema\tVN:%s\tCL:%s", VERSION, pg_argv[0]);
 	for (int i = 1; i < pg_argc; i++)
 		fprintf(out_file, " %s", pg_argv[i]);
 	fprintf(out_file, "\n");
+}
+
+void find_clouds_and_align(FILE *fq1,
+                           FILE *fq2,
+                           FILE *fqx,
+                           FILE *out_file,
+                           const int apply_opt,
+                           omp_lock_t *in_lock,
+                           omp_lock_t *out_lock)
+{
+#define STANDARD_FASTQ() (fqx == NULL)
+
+	assert((fq1 != NULL && fq2 != NULL) ^ (fqx != NULL));
+
+	omp_lock_t local_in_lock;
+	omp_lock_t local_out_lock;
+	int destroy_in_lock = 0;
+	int destroy_out_lock = 0;
+
+	if (in_lock == NULL) {
+		omp_init_lock(&local_in_lock);
+		in_lock = &local_in_lock;
+		destroy_in_lock = 1;
+	}
+
+	if (out_lock == NULL) {
+		omp_init_lock(&local_out_lock);
+		out_lock = &local_out_lock;
+		destroy_out_lock = 1;
+	}
+
+	const char *rg_id = (rg != NULL) ? (strstr(rg, "ID:") + 3) : NULL;  // pre-validated
 
 	/* for our special FASTQs */
 	FASTQRecord *fq1_recs_full = NULL;
@@ -237,7 +256,8 @@ void find_clouds_and_align(FILE *fq1, FILE *fq2, FILE *fqx, FILE *out_file, cons
 	if (!STANDARD_FASTQ())
 		read_special_fastq(fqx, &fq1_recs_full, &fq2_recs_full);
 
-	#pragma omp parallel num_threads(NUM_THREADS)
+	fprintf(stderr, "Processing reads...\n");
+	#pragma omp parallel num_threads(num_threads_per_file)
 	{
 		arena_init();
 		size_t nc = 0;
@@ -286,7 +306,7 @@ void find_clouds_and_align(FILE *fq1, FILE *fq2, FILE *fqx, FILE *out_file, cons
 			int good;
 
 			{
-				omp_set_lock(&in_lock);
+				omp_set_lock(in_lock);
 				if (STANDARD_FASTQ()) {
 					if (fq1 != fq2)
 						good = (read_fastq_rec_bc_group(fq1, &start1, &fq1_recs, &n_fq1_recs, &fq1_recs_cap) |
@@ -312,7 +332,7 @@ void find_clouds_and_align(FILE *fq1, FILE *fq2, FILE *fqx, FILE *out_file, cons
 						done = 1;
 					}
 				}
-				omp_unset_lock(&in_lock);
+				omp_unset_lock(in_lock);
 			}
 
 			if (!good)
@@ -572,10 +592,10 @@ void find_clouds_and_align(FILE *fq1, FILE *fq2, FILE *fqx, FILE *out_file, cons
 					best_mate->visited = 1;
 
 				{
-					omp_set_lock(&out_lock);
+					omp_set_lock(out_lock);
 					print_sam_record(best, best_mate, out_file, rg_id);
 					print_sam_record(best_mate, best, out_file, rg_id);
-					omp_unset_lock(&out_lock);
+					omp_unset_lock(out_lock);
 				}
 			}
 
@@ -602,8 +622,8 @@ void find_clouds_and_align(FILE *fq1, FILE *fq2, FILE *fqx, FILE *out_file, cons
 	}
 
 	arena_destroy();
-	omp_destroy_lock(&in_lock);
-	omp_destroy_lock(&out_lock);
+	if (destroy_in_lock)  omp_destroy_lock(in_lock);
+	if (destroy_out_lock) omp_destroy_lock(out_lock);
 }
 
 static bc_t get_bc_direct(FASTQRecord *rec)
@@ -769,6 +789,9 @@ static void read_special_fastq(FILE *fq, FASTQRecord **fq1_recs, FASTQRecord **f
 		copy_until_space(fq1->qual, &p);
 		copy_until_space(fq2->read, &p);
 		copy_until_space(fq2->qual, &p);
+
+		fq1->rlen = strlen(fq1->read);
+		fq2->rlen = strlen(fq2->read);
 
 		free(records[i]);
 	}

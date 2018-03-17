@@ -34,7 +34,7 @@ struct Count {
 	int64_t n_reads; // How many reads falling in here?
 	double prior;
 	int bucket; // Which bucket
-	
+
 	Count(): n_reads(0), bucket(0), prior(0) {}
 };
 
@@ -76,22 +76,9 @@ void correct_barcode(int start, int end, int thread,
 	vector<int64_t> stats(4, 0);
 
 	for (int ii = start; ii < end; ii++) {
-		/// TODO: better threading with std::map if it's possible at all
-		//if (it_c++ % max_threads != thread) { 
-		//	continue;
-		//}
-
 		auto &it = full_counts[ii];
 		const string &q = it.first;
 		int64_t fc = it.second.second;
-
-		// Is it already corrected?
-		// auto itt = corrected_counts.find(q);
-		// if (itt != corrected_counts.end()) {
-		// 	it.second.first = itt->second.first;
-		// 	stats[itt->second.second] += fc;
-		// 	continue;
-		// }
 
 		uint32_t barcode = 0;
 		it.second.first = 0; // Assign empty barcode
@@ -122,9 +109,9 @@ void correct_barcode(int start, int end, int thread,
 				for (int i2 = i1 + 1; i2 < BC_LEN; i2++) DOV(j2, 4) {
 					if (j2 == uint8_t(q[i2]) / QUAL_BASE)
 						continue;
-					uint32_t bcd = barcode 
-						& ~(3 << ((BC_LEN - i1 - 1) * 2)) 
-						& ~(3 << ((BC_LEN - i2 - 1) * 2)) 
+					uint32_t bcd = barcode
+						& ~(3 << ((BC_LEN - i1 - 1) * 2))
+						& ~(3 << ((BC_LEN - i2 - 1) * 2))
 						& ((1ll << (BC_LEN * 2)) - 1);
 					bcd |= (j1 << ((BC_LEN - i1 - 1) * 2));
 					bcd |= (j2 << ((BC_LEN - i2 - 1) * 2));
@@ -138,20 +125,20 @@ void correct_barcode(int start, int end, int thread,
 							max_p = p;
 							max_barcode = bcd;
 							type = H2CHANGE;
-						}							
+						}
 					}
 				}
 			}
 		} else if (ns <= 1) {
 			DOV(i, BC_LEN) {
-				if (ns && uint8_t(q[i]) % QUAL_BASE != 0) 
+				if (ns && uint8_t(q[i]) % QUAL_BASE != 0)
 					continue;
 				DOV(j, 4) {
 					if (ns == 0 && j == uint8_t(q[i]) / QUAL_BASE)
 						continue;
 					uint32_t bcd = barcode & ~(3 << ((BC_LEN - i - 1) * 2)) & ((1ll << (BC_LEN * 2)) - 1);
 					bcd |= (j << ((BC_LEN - i - 1) * 2));
-					
+
 					auto cit = known_counts.find(bcd);
 					if (cit != known_counts.end()) {
 						double p = cit->second.prior * get_prob(uint8_t(q[i]) % QUAL_BASE);
@@ -160,11 +147,11 @@ void correct_barcode(int start, int end, int thread,
 							max_p = p;
 							max_barcode = bcd;
 							type = H1CHANGE;
-						}							
+						}
 					}
 				}
 			}
-		} 
+		}
 
 		if (max_p / total > BC_CONF_THRESH) {
 			it.second.first = max_barcode;
@@ -191,7 +178,6 @@ void correct_barcode(int start, int end, int thread,
 			auto &c = full_counts[ii];
 			auto new_bcd = c.second.first;
 			if (new_bcd != 0) {
-				// assert(known_counts.find(new_bcd) != known_counts.end());
 				known_counts[new_bcd].n_reads += c.second.second;
 			}
 		}
@@ -206,23 +192,23 @@ void load_barcode_count(const string &path, unordered_map<uint32_t, Count> &coun
 {
 	eprn(":: Loading known counts file {} ... ", path);
 	FILE *f = fopen(path.c_str(), "rb");
-	assert(f != NULL);
+	die_if(f == NULL, "Cannot open file {}", path);
 	int64_t total;
 	size_t c = fread(&total, 8, 1, f);
-	assert(c == 1);
+	die_if(c != 1, "fread failed (corrupted input?)");
 	while (total--) {
 		uint32_t bcd;
 		c = fread(&bcd, 4, 1, f);
-		assert(c == 1);
+		die_if(c != 1, "fread failed (corrupted input?)");
 		int64_t cnt;
 		c = fread(&cnt, 8, 1, f);
-		assert(c == 1);
+		die_if(c != 1, "fread failed (corrupted input?)");
 		counts[bcd].prior += cnt;
 	}
 	fclose(f);
 }
 
-void load_and_correct_full_count(const string &path, 
+void load_and_correct_full_count(const string &path,
 	unordered_map<uint32_t, Count> &known_counts,
 	unordered_map<string, uint32_t> &corrected_counts,
 	vector<int64_t> &stats,
@@ -232,25 +218,25 @@ void load_and_correct_full_count(const string &path,
 	eprn(":: Loading full counts file {} ... ", path);
 
 	FILE *f = fopen(path.c_str(), "rb");
-	assert(f != NULL);
+	die_if(f == NULL, "Cannot open file {}", path);
 
 	int64_t total, dump = 0;
 	size_t c;
 	string b = string(BC_LEN, '#');
 	while (fread(&total, 8, 1, f) == 1) {
 		auto T = cur_time();
-		
+
 		vector<pair<string, pair<uint32_t, int64_t>>> full_counts;
 		full_counts.reserve(total);
 		while (total--) {
 			c = fread(&b[0], 1, BC_LEN, f);
-			assert(c == BC_LEN);
+			die_if(c != BC_LEN, "fread failed (corrupted input?)");
 			int64_t cnt;
 			c = fread(&cnt, 8, 1, f);
-			assert(c == 1);
+			die_if(c != 1, "fread failed (corrupted input?)");
 			full_counts.push_back({b, {0, cnt}});
 		}
-		eprn("::: Loading dump {} of size {:n} ({:n} MB) done in {} s", ++dump, 
+		eprn("::: Loading dump {} of size {:n} ({:n} MB) done in {} s", ++dump,
 			full_counts.size(), full_counts.size() * (sizeof(full_counts[0]) + 16) / MB, elapsed(T)); T = cur_time();
 
 		vector<thread> threads;
@@ -258,18 +244,18 @@ void load_and_correct_full_count(const string &path,
 		int nchunks = ceil(double(full_counts.size()) / nthreads);
 		for (int i = 0; i < nthreads; i++) {
 			threads.push_back(thread(
-				correct_barcode, 
+				correct_barcode,
 				i * nchunks, min(size_t(i + 1) * nchunks, full_counts.size()),
-				i, 
-				ref(known_counts), 
-				ref(full_counts), 
+				i,
+				ref(known_counts),
+				ref(full_counts),
 				ref(corrected_counts),
 				ref(stats),
 				do_h2
 			));
 		}
 		for (auto &t: threads) {
-			t.join(); 
+			t.join();
 		}
 		eprn("::: Correcting done in {} s", elapsed(T)); T = cur_time();
 		// eprn("--> corrected counts size: {:n}", estimate_size(corrected_counts));
@@ -281,35 +267,44 @@ void load_and_correct_full_count(const string &path,
 /******************************************************************************/
 
 EXTERNC void correct(
-	const char *known_barcodes_path, 
-	const char **input_prefix, 
+	const char *known_barcodes_path,
+	const char **input_prefix,
 	const int input_prefix_size,
-	const char *output_dir, 
+	const char *output_dir,
 	const char do_h2,
 	const size_t buffer_size,
-	const int nthreads, 
-	const int nbuckets) 
+	const int nthreads,
+	const int nbuckets)
 {
 	auto T = cur_time();
 	initialize_probs();
-	eprn(":: Bucketing {} inputs into {} files with {} threads", 
+	eprn(":: Bucketing {} inputs into {} files with {} threads",
 		input_prefix_size, nbuckets, nthreads);
-	
+
 /// 1. Load known counts
 	unordered_map<uint32_t, Count> known_counts;
 	string s, q, n, r;
 	ifstream fin(known_barcodes_path);
-	assert(!fin.fail());
+	die_if(fin.fail(), "Cannot open file {}", known_barcodes_path);
 	while (getline(fin, s)) {
 		uint32_t barcode = 0;
 		DO(BC_LEN) barcode = (barcode << 2) | hash_dna(s[_]);
-		assert(barcode != 0);
+		die_if(barcode == 0, "Invalid barcode AAA...AA whitelisted");
 		known_counts[barcode].prior = 0;
 	}
 	fin.close();
 
 	for (int fi = 0; fi < input_prefix_size; fi++) {
-		load_barcode_count(fmt::format("{}.ema-ncnt", input_prefix[fi]), known_counts);
+		string s = input_prefix[fi];
+		die_if(stat_dir(s) != 2, "{} is not a file", s);
+		// eprn("--> {}", s.substr(s.size() - 8));
+		die_if(s.size() < 9 || s.substr(s.size() - 9) != ".ema-ncnt", "{} is not an ema-ncnt file", s);
+		s[s.size() - 4] = 'f';
+		die_if(stat_dir(s) != 2, "{} is not a file", s);
+	}
+
+	for (int fi = 0; fi < input_prefix_size; fi++) {
+		load_barcode_count(fmt::format("{}", input_prefix[fi]), known_counts);
 	}
 	double total_counts = 0;
 	for (auto &c: known_counts) {
@@ -324,11 +319,13 @@ EXTERNC void correct(
 	unordered_map<string, uint32_t> corrected_counts;
 	vector<int64_t> stats(4, 0);
 	for (int fi = 0; fi < input_prefix_size; fi++) {
+		s = input_prefix[fi];
+		s[s.size() - 4] = 'f';
 		load_and_correct_full_count(
-			fmt::format("{}.ema-fcnt", input_prefix[fi]), 
+			fmt::format("{}", s),
 			known_counts,
-			corrected_counts, 
-			stats, 
+			corrected_counts,
+			stats,
 			do_h2,
 			nthreads
 		);
@@ -336,14 +333,20 @@ EXTERNC void correct(
 	eprn(":: Stats: no change: {:n} \n"
 		 "         no barcode: {:n} \n"
 		 "       H1-corrected: {:n} \n"
-		 "       H2-corrected: {:n} ", 
+		 "       H2-corrected: {:n} ",
 		 stats[NOCHANGE], stats[NOBUCKET], stats[H1CHANGE], stats[H2CHANGE]);
+	size_t total = stats[NOCHANGE] + stats[NOBUCKET] + stats[H1CHANGE] + stats[H2CHANGE];
 	eprn(":: Corrected map size: {:n} (~ {:n} MB)", corrected_counts.size(), estimate_size(corrected_counts) / MB);
 	eprn(":: Correcting barcodes ... done in {:.1f} s", elapsed(T)); T = cur_time();
 
 /// 3. Set up bucket boundaries
 	// 3a. Create file handles and buffers
-	assert(S_ISDIR(stat_file(output_dir)));
+	int de = stat_dir(output_dir);
+	die_if(de == 2, "{} exists but is not a directory", output_dir);
+	if (de == 0) {
+		int de = mkdir(output_dir, S_IRWXU | S_IRWXG | S_IROTH | S_IXOTH);
+		die_if(de == -1, "Cannot create directory {}", output_dir);
+	}
 	struct PQFile {
 		int64_t size; // current size
 		FILE *file;
@@ -356,13 +359,13 @@ EXTERNC void correct(
 		.buf = (char*)malloc(buffer_size + 10 * KB),
 		.buf_size = 0
 	}};
-	assert(files.back().buf != NULL);
-	assert(files.back().file != NULL);
+	die_if(files.back().buf == NULL, "Cannot allocate memory");
+	die_if(files.back().file == NULL, "Cannot open file {}", fmt::format("{}/ema-bin-nobc", output_dir));
 
 	// Have the smallest file at the top
-	auto PQComp = [&](int a, int b) { 
-		return tie(files[a].size, a) > tie(files[b].size, b); 
-	}; 
+	auto PQComp = [&](int a, int b) {
+		return tie(files[a].size, a) > tie(files[b].size, b);
+	};
 	priority_queue<int, vector<int>, decltype(PQComp)> pq(PQComp);
 	for (int i = 0; i < nbuckets; i++) {
 		files.push_back({
@@ -371,8 +374,8 @@ EXTERNC void correct(
 			.buf = (char*)malloc(buffer_size + 10 * KB),
 			.buf_size = 0
 		});
-		assert(files.back().buf != NULL);
-		assert(files.back().file != NULL);
+		die_if(files.back().buf == NULL, "Cannot allocate memory");
+		die_if(files.back().file == NULL, "Cannot open file {}", fmt::format("{}/ema-bin-{:03}", output_dir, i));
 		pq.push(files.size() - 1);
 	}
 	/// 3b. Bucket the barcodes
@@ -388,14 +391,15 @@ EXTERNC void correct(
 	// 	eprn("{} -> {:n}", i, files[i].size);
 	// }
 	// exit(0);
-	
+
 /// 4. Write buckets
 	char bcd[BC_LEN + 1];
 	bcd[BC_LEN] = 0;
 	string b = string(BC_LEN, '#');
 
 	// ifstream cin("../../ema/data/inter.fq");
-	while (getline(cin, n)) { 
+	size_t current = 0;
+	while (getline(cin, n)) {
 		getline(cin, r);
 		getline(cin, q);
 		getline(cin, q);
@@ -407,13 +411,13 @@ EXTERNC void correct(
 			has_n |= (r[_] == 'N');
 			b[_] = hash_dna(r[_]) * QUAL_BASE + min(QUAL_BASE - 1, q[_] - ILLUMINA_QUAL_OFFSET);
 		}
-		
+
 		int fidx;
 		auto cit = corrected_counts.find(b);
 		if (cit != corrected_counts.end()) {
 			barcode = cit->second;
 			has_n = 0;
-		} 
+		}
 		auto kit = has_n ? known_counts.end() : known_counts.find(barcode);
 		if (kit != known_counts.end()) {
 			fidx = kit->second.bucket;
@@ -421,45 +425,72 @@ EXTERNC void correct(
 			barcode = 0;
 			fidx = 0;
 		}
-		
+
 		char *buff = files[fidx].buf;
 		size_t &buffi = files[fidx].buf_size;
 
 		// Barcode
 		if (barcode != 0) {
 			DO(BC_LEN) bcd[BC_LEN - _ - 1] = "ACGT"[barcode & 3], barcode >>= 2;
-			memcpy(buff + buffi, bcd, BC_LEN); 
+			memcpy(buff + buffi, bcd, BC_LEN);
 			buffi += BC_LEN;
 			buff[buffi++] = ' ';
 		}
 
 		// Name
 		for (auto c: n) {
-			if (isspace(c)) break; 
+			if (isspace(c)) break;
 			buff[buffi++] = c;
 		}
-		buff[buffi++] = ' ';
+		if (fidx) {
+			buff[buffi++] = ' ';
+		} else {
+			buff[buffi++] = '\n';
+		}
 
 		// Trimmed read
-		memcpy(buff + buffi, r.c_str() + BC_LEN + MATE1_TRIM, r.size() - BC_LEN - MATE1_TRIM); 
-		buffi += r.size() - BC_LEN - MATE1_TRIM;	
-		buff[buffi++] = ' ';
+		memcpy(buff + buffi, r.c_str() + BC_LEN + MATE1_TRIM, r.size() - BC_LEN - MATE1_TRIM);
+		buffi += r.size() - BC_LEN - MATE1_TRIM;
+		if (fidx) {
+			buff[buffi++] = ' ';
+		} else {
+			buff[buffi++] = '\n';
+			buff[buffi++] = '+';
+			buff[buffi++] = '\n';
+		}
 
 		// Trimmed quality
-		memcpy(buff + buffi, q.c_str() + BC_LEN + MATE1_TRIM, q.size() - BC_LEN - MATE1_TRIM); 
+		memcpy(buff + buffi, q.c_str() + BC_LEN + MATE1_TRIM, q.size() - BC_LEN - MATE1_TRIM);
 		buffi += r.size() - BC_LEN - MATE1_TRIM;
-		buff[buffi++] = ' ';
-		
-		getline(cin, s); 
-		getline(cin, s); 
+		if (fidx) {
+			buff[buffi++] = ' ';
+		} else {
+			buff[buffi++] = '\n';
+		}
+
+		getline(cin, s);
+		if (!fidx) {
+			for (auto c: s) {
+				if (isspace(c)) break;
+				buff[buffi++] = c;
+			}
+			buff[buffi++] = '\n';
+		}
+		getline(cin, s);
 		// Pair read
-		memcpy(buff + buffi, s.c_str(), s.size()); 
+		memcpy(buff + buffi, s.c_str(), s.size());
 		buffi += s.size();
-		buff[buffi++] = ' ';
-		getline(cin, s); 
-		getline(cin, s); 
+		if (fidx) {
+			buff[buffi++] = ' ';
+		} else {
+			buff[buffi++] = '\n';
+			buff[buffi++] = '+';
+			buff[buffi++] = '\n';
+		}
+		getline(cin, s);
+		getline(cin, s);
 		// Pair quality
-		memcpy(buff + buffi, s.c_str(), s.size()); 
+		memcpy(buff + buffi, s.c_str(), s.size());
 		buffi += s.size();
 		buff[buffi++] = '\n';
 
@@ -467,7 +498,15 @@ EXTERNC void correct(
 			fwrite(buff, 1, buffi, files[fidx].file);
 			buffi = 0;
 		}
+
+		current++;
+		if (current % 1000000 == 0) {
+			double pct = double(current) * 100. / total;
+			eprnn("\r:: [{}] {:n} out of {:n} ({:.2f}%)",
+				string(pct / 2, '='), current, total, pct);
+		}
 	}
+	eprn("\r:: [{}] {:n} out of {:n} ({:.2f}%)", string(50, '='), current, total, 100.0);
 	for (int fidx = 0; fidx < files.size(); fidx++) {
 		fwrite(files[fidx].buf, 1, files[fidx].buf_size, files[fidx].file);
 		fclose(files[fidx].file);

@@ -10,7 +10,8 @@ char *chrom_lookup(const chrom_t chrom);
 chrom_t chrom_index(const char *chrom);
 void read_fai(FILE *fai_file);
 
-extern int NUM_THREADS;
+extern int num_threads_per_file;
+extern int num_threads_for_files;
 extern char *rg;
 extern char **pg_argv;
 extern int pg_argc;
@@ -22,6 +23,16 @@ extern PlatformProfile *tech;
 #define TRACK_READ ""
 
 #define VERSION "0.5.0"
+
+#define KB 1024
+#define MB (1024 * KB)
+#define GB (1024 * MB)
+
+#ifdef __cplusplus
+#define EXTERNC extern "C"
+#else
+#define EXTERNC
+#endif
 
 #endif /* MAIN_H */
 
