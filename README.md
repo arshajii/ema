@@ -72,17 +72,34 @@ We also use a 10x barcode whitelist, which can be found [here](http://ema.csail.
 #### Preprocessing
 Preprocessing 10x data entails several steps, the first of which is counting barcodes (`-j` specifies the number of jobs to be spawned by `parallel`):
 
-```
+```bash
 cd /path/to/gzipped_fastqs/
-parallel -j40 --bar 'pigz -c -d {} | ema count -w /path/to/whitelist.txt -o {/.} 2>{/.}.log' ::: *.gz
+parallel -j40 --bar 'pigz -c -d {} | \
+  ema count -w /path/to/whitelist.txt -o {/.} 2>{/.}.log' ::: *.gz
 ```
 
-Make sure that only the FASTQs containing the actual reads are included in `*.gz` above (as opposed to sample indices). This will produce `*.ema-ncnt` files, containing the count data.
+Make sure that only the FASTQs **are interleaved** and containing the actual reads are included in `*.gz` above (as opposed to sample indices, typically with `_I1_` in their filenames). This will produce `*.ema-ncnt` and `*.ema-fcnt` files, containing the count data.
+
+If you do not have interleaved files, you can interleave them as follows:
+
+```bash
+paste <(pigz -c -d {} | paste - - - -) <(pigz -c -d {= s:_R1_:_R2_: =} | paste - - - -) | tr "\t" "\n" |\
+  ema count -w /path/to/whitelist.txt -o {/.} 2>{/.}.log' ::: *_R1_*.gz
+```
+
+where `s:_R1_:_R2_:` is the regex that casts first-end filenames into the second-end filenames (make sure to adjust this if your naming scheme is different).
 
 Now we can do the actual preprocessing, which splits the input into barcode bins (500 by default; specified with `-n`). This preprocessing can be parallelized via `-t`, which specifies how many threads to use:
 
-```
+```bash
 pigz -c -d *.gz | ema preproc -w /path/to/whitelist.txt -n 500 -t 40 -o output_dir *.ema-ncnt 2>&1 | tee preproc.log
+```
+
+or if you do not have interleaved files:
+
+```bash
+paste <(pigz -c -d *_R1_*.gz | paste - - - -) <(pigz -c -d *_R2_*.gz | paste - - - -) | tr "\t" "\n" |\
+  ema preproc -w /path/to/whitelist.txt -n 500 -t 40 -o output_dir *.ema-ncnt 2>&1 | tee preproc.log
 ```
 
 #### Mapping
