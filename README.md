@@ -83,7 +83,7 @@ Make sure that the FASTQs **are interleaved** and **only contain the actual read
 If you do not have interleaved files, you can interleave them as follows:
 
 ```bash
-paste <(pigz -c -d {} | paste - - - -) <(pigz -c -d {= s:_R1_:_R2_: =} | paste - - - -) | tr "\t" "\n" |\
+parallel -j40 --bar 'paste <(pigz -c -d {} | paste - - - -) <(pigz -c -d {= s:_R1_:_R2_: =} | paste - - - -) | tr "\t" "\n" |\
   ema count -w /path/to/whitelist.txt -o {/.} 2>{/.}.log' ::: *_R1_*.gz
 ```
 
