@@ -106,14 +106,15 @@ paste <(pigz -c -d *_R1_*.gz | paste - - - -) <(pigz -c -d *_R2_*.gz | paste - -
 First we map each barcode bin with EMA. Here, we'll do this using a combination of GNU Parallel and EMA's internal multithreading, which we found to be optimal due to the runtime/memory trade-off. In the following, for instance, we use 10 jobs each with 4 threads (for 40 total threads). We also pipe EMA's SAM output (stdout by default) to `samtools sort`, which produces a sorted BAM:
 
 ```bash
-parallel --bar -j10 "ema align -t 4 -d -r /path/to/ref.fa -s {} | samtools sort -@ 4 -O bam -l 0 -m 4G -o {}.bam -"
+parallel --bar -j10 "ema align -t 4 -d -r /path/to/ref.fa -s {} |\
+  samtools sort -@ 4 -O bam -l 0 -m 4G -o {}.bam -" ::: output_dir/ema-bin-???
 ```
 
 Lastly, we map the no-barcode bin with BWA:
 
 ```bash
-bwa mem -p -t 40 -M -R "@RG\tID:rg1\tSM:sample1" /path/to/ref.fa output_dir/ema-bin-nobc |\
-  samtools sort -@ 4 -O bam -l 0 -m 4G -o output_dir/ema-bin-nobc.bam
+bwa mem -p -t 40 -M -R "@RG\tID:rg1\tSM:sample1" /path/to/ref.fa output_dir/ema-nobc |\
+  samtools sort -@ 4 -O bam -l 0 -m 4G -o output_dir/ema-nobc.bam
 ```
 
 Note that `@RG\tID:rg1\tSM:sample1` is EMA's default read group. If you specify another for EMA, be sure to specify the same for BWA as well (both tools take the full read group string via `-R`).
@@ -122,8 +123,8 @@ Note that `@RG\tID:rg1\tSM:sample1` is EMA's default read group. If you specify 
 EMA performs duplicate marking automatically. We mark duplicates on BWA's output with `sambamba markdup`:
 
 ```bash
-sambamba markdup -t 40 -p -l 0 output_dir/ema-bin-nobc.bam output_dir/ema-bin-nobc-dupsmarked.bam
-rm output_dir/ema-bin-nobc.bam
+sambamba markdup -t 40 -p -l 0 output_dir/ema-nobc.bam output_dir/ema-nobc-dupsmarked.bam
+rm output_dir/ema-nobc.bam
 ```
 
 Now we merge all BAMs into a single BAM (might require modifying `ulimit`s, as in `ulimit -n 10000`):
