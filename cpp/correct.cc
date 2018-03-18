@@ -355,7 +355,7 @@ EXTERNC void correct(
 	};
 	vector<PQFile> files { PQFile { // Non-bucketed reads
 		.size = 0,
-		.file = fopen(fmt::format("{}/ema-bin-nobc", output_dir).c_str(), "wb"),
+		.file = fopen(fmt::format("{}/ema-nobc", output_dir).c_str(), "wb"),
 		.buf = (char*)malloc(buffer_size + 10 * KB),
 		.buf_size = 0
 	}};
