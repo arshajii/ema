@@ -75,10 +75,10 @@ Preprocessing 10x data entails several steps, the first of which is counting bar
 ```bash
 cd /path/to/gzipped_fastqs/
 parallel -j40 --bar 'pigz -c -d {} | \
-  ema count -w /path/to/whitelist.txt -o {/.} 2>{/.}.log' ::: *.gz
+  ema count -w /path/to/whitelist.txt -o {/.} 2>{/.}.log' ::: *RA*.gz
 ```
 
-Make sure that the FASTQs **are interleaved** and **only contain the actual reads**  in `*.gz`s above (as opposed to sample indices, typically with `_I1_` in their filenames). This will produce `*.ema-ncnt` and `*.ema-fcnt` files, containing the count data.
+Make sure that the FASTQs **are interleaved** and **only contain the actual reads**  in the files above (as opposed to sample indices, typically with `I1` in their filenames rather than `RA`). This will produce `*.ema-ncnt` and `*.ema-fcnt` files, containing the count data.
 
 If you do not have interleaved files, you can interleave them as follows:
 
@@ -92,7 +92,7 @@ where `s:_R1_:_R2_:` is the regex that casts first-end filenames into the second
 Now we can do the actual preprocessing, which splits the input into barcode bins (500 by default; specified with `-n`). This preprocessing can be parallelized via `-t`, which specifies how many threads to use:
 
 ```bash
-pigz -c -d *.gz | ema preproc -w /path/to/whitelist.txt -n 500 -t 40 -o output_dir *.ema-ncnt 2>&1 | tee preproc.log
+pigz -c -d *RA*.gz | ema preproc -w /path/to/whitelist.txt -n 500 -t 40 -o output_dir *.ema-ncnt 2>&1 | tee preproc.log
 ```
 
 or if you do not have interleaved files:
