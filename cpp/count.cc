@@ -9,6 +9,8 @@
 
 using namespace std;
 
+
+
 /******************************************************************************/
 
 void dump_map(map<string, int64_t> &full_counts, FILE *fo)
@@ -66,6 +68,7 @@ EXTERNC void count(
 	string b = string(BC_LEN, '#');
 	int64_t total_reads = 0;
 	int64_t nice_reads = 0;
+	int64_t ignored_reads = 0;
 	int64_t sz = 0;
 	while (getline(cin, s)) { // N R1 Q1 R2 Q2
 		sz += s.size() + 1;
@@ -73,35 +76,44 @@ EXTERNC void count(
 		getline(cin, q); sz += q.size() + 1;
 		getline(cin, q); sz += q.size() + 1;
 
+		bool process = s.size() >= MIN_READ_SIZE;
+
 		bool has_n = 0;
 		barcode = 0;
-		DO(BC_LEN) { // 0..33 34..
+		if (process) DO(BC_LEN) { // 0..33 34..
 			die_if((s[_] == 'N' && q[_] != '#') || (s[_] != 'N' && q[_] == '#'), 
 				"# quality score does not match N ({} vs. {})", s[_], q[_]);
-			die_if(q[_] < ILLUMINA_QUAL_OFFSET, "Quality score less than {}", ILLUMINA_QUAL_OFFSET);
-
+			if (q[_] < ILLUMINA_QUAL_OFFSET) {
+				process = false;
+				eprn("Ignoring long read--- quality score {} less than {}", q, ILLUMINA_QUAL_OFFSET);
+				break;
+			}
 			b[_] = hash_dna(s[_]) * QUAL_BASE + min(QUAL_BASE - 1, q[_] - ILLUMINA_QUAL_OFFSET);
 			barcode = (barcode << 2) | hash_dna(s[_]);
 			has_n |= (s[_] == 'N');
 		}
-		if (!has_n) {
-			auto it = counts.find(barcode);
-			if (it != counts.end()) {
-				it->second++;
-				nice_reads++;
+		if (process) {
+			if (!has_n) {
+				auto it = counts.find(barcode);
+				if (it != counts.end()) {
+					it->second++;
+					nice_reads++;
+				}
 			}
-		}
-
-		int cnt = full_counts[b]++;
-		if (!cnt && estimate_size(full_counts) >= max_map_size) { // new element
-			dump_map(full_counts, f_full);
+			int cnt = full_counts[b]++;
+			if (!cnt && estimate_size(full_counts) >= max_map_size) { // new element
+				dump_map(full_counts, f_full);
+			}
+			total_reads++;
+		} else {
+			ignored_reads++;
 		}
 
 		DO(4) { getline(cin, s); sz += s.size() + 1; }
-		total_reads++;
 	}
 	eprn(":: Counting took {:.1f} s", elapsed(T)); T = cur_time();
 	eprn(":: Reads with OK barcode: {:n} out of {:n}", nice_reads, total_reads);
+	eprn(":: Ignored {:n} reads", ignored_reads);
 
 	int64_t tenx_buckets = 0;
 	for (auto &bcd: counts) if (bcd.second) {

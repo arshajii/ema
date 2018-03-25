@@ -404,12 +404,25 @@ EXTERNC void correct(
 		getline(cin, q);
 		getline(cin, q);
 
+		bool process = r.size() >= MIN_READ_SIZE;
+
 		uint32_t barcode;
 		bool has_n = 0;
-		DO(BC_LEN) {
+		if (process) DO(BC_LEN) {
+			if (q[_] < ILLUMINA_QUAL_OFFSET) {
+				process = false;
+				eprn("Ignoring long read--- quality score {} less than {}", q, ILLUMINA_QUAL_OFFSET);
+				break;
+			}
+
 			barcode = (barcode << 2) | hash_dna(r[_]);
 			has_n |= (r[_] == 'N');
 			b[_] = hash_dna(r[_]) * QUAL_BASE + min(QUAL_BASE - 1, q[_] - ILLUMINA_QUAL_OFFSET);
+		}
+
+		if (!process) {
+			DO(4) getline(cin, s);
+			continue;
 		}
 
 		int fidx;

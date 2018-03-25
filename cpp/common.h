@@ -58,6 +58,8 @@ const int BC_LEN = 16;
 const int ILLUMINA_QUAL_OFFSET = 33;
 const int QUAL_BASE = ILLUMINA_QUAL_OFFSET + 1;
 
+const int MIN_READ_SIZE = 32;
+
 const size_t KB = 1024;
 const size_t MB = 1024 * KB;
 const size_t GB = 1024 * MB;
