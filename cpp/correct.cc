@@ -84,8 +84,9 @@ void correct_barcode(int start, int end, int thread,
 		it.second.first = 0; // Assign empty barcode
 		int ns = 0; // how many Ns?
 		DO(BC_LEN) {
-			barcode = (barcode << 2) | (uint8_t(q[_]) / QUAL_BASE);
-			ns += (uint8_t(q[_]) % QUAL_BASE == 0);
+			char n = uint8_t(q[_]) / QUAL_BASE;
+			barcode = (barcode << 2) | (n == 4 ? 0 : n); // Ns are 4
+			ns += (n == 4); // (uint8_t(q[_]) % QUAL_BASE == 0);
 		}
 		if (ns > 1) {
 			stats[NOBUCKET] += fc;
@@ -131,7 +132,7 @@ void correct_barcode(int start, int end, int thread,
 			}
 		} else if (ns <= 1) {
 			DOV(i, BC_LEN) {
-				if (ns && uint8_t(q[i]) % QUAL_BASE != 0)
+				if (ns && uint8_t(q[i]) / QUAL_BASE != 4)
 					continue;
 				DOV(j, 4) {
 					if (ns == 0 && j == uint8_t(q[i]) / QUAL_BASE)
@@ -414,10 +415,14 @@ EXTERNC void correct(
 				eprn("Ignoring long read--- quality score {} less than {}", q, ILLUMINA_QUAL_OFFSET);
 				break;
 			}
+			if (q[_] - ILLUMINA_QUAL_OFFSET >= QUAL_BASE) {
+				eprn("Trimming quality score {} to {}", q[_], char(ILLUMINA_QUAL_OFFSET + QUAL_BASE - 1));
+				q[_] = ILLUMINA_QUAL_OFFSET + QUAL_BASE - 1;
+			}
 
 			barcode = (barcode << 2) | hash_dna(r[_]);
 			has_n |= (r[_] == 'N');
-			b[_] = hash_dna(r[_]) * QUAL_BASE + min(QUAL_BASE - 1, q[_] - ILLUMINA_QUAL_OFFSET);
+			b[_] = hash_dna_n(r[_]) * QUAL_BASE + min(QUAL_BASE - 1, q[_] - ILLUMINA_QUAL_OFFSET);
 		}
 
 		if (!process) {

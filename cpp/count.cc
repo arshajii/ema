@@ -81,14 +81,19 @@ EXTERNC void count(
 		bool has_n = 0;
 		barcode = 0;
 		if (process) DO(BC_LEN) { // 0..33 34..
-			die_if((s[_] == 'N' && q[_] != '#') || (s[_] != 'N' && q[_] == '#'), 
-				"# quality score does not match N ({} vs. {})", s[_], q[_]);
+			//die_if((s[_] == 'N' && q[_] != '#') || (s[_] != 'N' && q[_] == '#'), 
+			//	"# quality score does not match N ({} vs. {})", s[_], q[_]);
 			if (q[_] < ILLUMINA_QUAL_OFFSET) {
 				process = false;
 				eprn("Ignoring long read--- quality score {} less than {}", q, ILLUMINA_QUAL_OFFSET);
 				break;
 			}
-			b[_] = hash_dna(s[_]) * QUAL_BASE + min(QUAL_BASE - 1, q[_] - ILLUMINA_QUAL_OFFSET);
+			if (q[_] - ILLUMINA_QUAL_OFFSET >= QUAL_BASE) {
+				eprn("Trimming quality score {} to {}", q[_], char(ILLUMINA_QUAL_OFFSET + QUAL_BASE - 1));
+				q[_] = ILLUMINA_QUAL_OFFSET + QUAL_BASE - 1;
+			}
+
+			b[_] = hash_dna_n(s[_]) * QUAL_BASE + min(QUAL_BASE - 1, q[_] - ILLUMINA_QUAL_OFFSET);
 			barcode = (barcode << 2) | hash_dna(s[_]);
 			has_n |= (s[_] == 'N');
 		}

@@ -3,7 +3,7 @@ SOURCES:=$(wildcard ./*.cc)
 OBJECTS:=$(SOURCES:.cc=.o)
 DEP := $(OBJECTS:.o=.d)
 
-CPPFLAGS = -c -MMD -MP -I.
+CPPFLAGS = -c -MMD -MP -I. -std=c++11
 
 .PHONY: all clean
 
