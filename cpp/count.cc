@@ -89,7 +89,7 @@ EXTERNC void count(
 				break;
 			}
 			if (q[_] - ILLUMINA_QUAL_OFFSET >= QUAL_BASE) {
-				eprn("Trimming quality score {} to {}", q[_], char(ILLUMINA_QUAL_OFFSET + QUAL_BASE - 1));
+				//eprn("Trimming quality score {} to {}", q[_], char(ILLUMINA_QUAL_OFFSET + QUAL_BASE - 1));
 				q[_] = ILLUMINA_QUAL_OFFSET + QUAL_BASE - 1;
 			}
 
