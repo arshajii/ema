@@ -11,7 +11,13 @@ EMA uses a latent variable model to align barcoded short-reads (such as those pr
 brew install brewsci/bio/ema
 ```
 
-#### From source
+#### With `conda` 🐍
+
+```bash
+conda install -c bioconda ema
+```
+
+#### From source 🛠️
 
 ```bash
 git clone --recursive https://github.com/arshajii/ema
