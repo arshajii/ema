@@ -154,5 +154,5 @@ Instructions for preprocessing and running EMA on data from other sequencing pla
 EMA outputs a standard SAM file with several additional tags:
 
 - `XG`: alignment probability
-- `XC`: cloud identifier
+- `MI`: cloud identifier (compatible with Long Ranger)
 - `XA`: alternate high-probability alignments
