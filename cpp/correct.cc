@@ -274,6 +274,7 @@ EXTERNC void correct(
 	const char *output_dir,
 	const char do_h2,
 	const size_t buffer_size,
+	const char do_bx_format,
 	const int nthreads,
 	const int nbuckets)
 {
@@ -448,13 +449,18 @@ EXTERNC void correct(
 		size_t &buffi = files[fidx].buf_size;
 
 		// Barcode
-		if (barcode != 0) {
-			DO(BC_LEN) bcd[BC_LEN - _ - 1] = "ACGT"[barcode & 3], barcode >>= 2;
-			memcpy(buff + buffi, bcd, BC_LEN);
-			buffi += BC_LEN;
+		#define PRINT_BCD() \
+		if (barcode != 0) { \
+			auto bc = barcode; \
+			DO(BC_LEN) bcd[BC_LEN - _ - 1] = "ACGT"[bc & 3], bc >>= 2; \
+			memcpy(buff + buffi, bcd, BC_LEN); \
+			buffi += BC_LEN; \
+		}
+		if (fidx && !do_bx_format) {
+			PRINT_BCD();
 			buff[buffi++] = ' ';
 		}
-
+	
 		// Name
 		for (auto c: n) {
 			if (isspace(c)) break;
@@ -462,6 +468,13 @@ EXTERNC void correct(
 		}
 		if (fidx) {
 			buff[buffi++] = ' ';
+			if (do_bx_format) {
+				memcpy(buff + buffi, "BX:Z:", 5);
+				buffi += 5;
+				PRINT_BCD();
+				memcpy(buff + buffi, "-1\n", 3);
+				buffi += 3;
+			}
 		} else {
 			buff[buffi++] = '\n';
 		}
@@ -469,7 +482,7 @@ EXTERNC void correct(
 		// Trimmed read
 		memcpy(buff + buffi, r.c_str() + BC_LEN + MATE1_TRIM, r.size() - BC_LEN - MATE1_TRIM);
 		buffi += r.size() - BC_LEN - MATE1_TRIM;
-		if (fidx) {
+		if (fidx && !do_bx_format) {
 			buff[buffi++] = ' ';
 		} else {
 			buff[buffi++] = '\n';
@@ -480,17 +493,24 @@ EXTERNC void correct(
 		// Trimmed quality
 		memcpy(buff + buffi, q.c_str() + BC_LEN + MATE1_TRIM, q.size() - BC_LEN - MATE1_TRIM);
 		buffi += r.size() - BC_LEN - MATE1_TRIM;
-		if (fidx) {
+		if (fidx && !do_bx_format) {
 			buff[buffi++] = ' ';
 		} else {
 			buff[buffi++] = '\n';
 		}
 
 		getline(cin, s);
-		if (!fidx) {
+		if (!fidx || do_bx_format) {
 			for (auto c: s) {
 				if (isspace(c)) break;
 				buff[buffi++] = c;
+			}
+			if (do_bx_format) {
+				memcpy(buff + buffi, " BX:Z:", 6);
+				buffi += 6;
+				PRINT_BCD();
+				memcpy(buff + buffi, "-1", 2);
+				buffi += 2;
 			}
 			buff[buffi++] = '\n';
 		}
@@ -498,7 +518,7 @@ EXTERNC void correct(
 		// Pair read
 		memcpy(buff + buffi, s.c_str(), s.size());
 		buffi += s.size();
-		if (fidx) {
+		if (fidx && !do_bx_format) {
 			buff[buffi++] = ' ';
 		} else {
 			buff[buffi++] = '\n';

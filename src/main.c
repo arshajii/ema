@@ -138,8 +138,9 @@ int main(const int argc, char *argv[])
 		char *out = NULL;
 		int t = 1;
 		char c;
+		char do_bx_format = 0;
 
-		while ((c = getopt(argc-1, &argv[1], "w:n:ho:t:")) != -1) {
+		while ((c = getopt(argc-1, &argv[1], "w:n:hbo:t:")) != -1) {
 			switch (c) {
 			case 'w':
 				wl = strdup(optarg);
@@ -155,6 +156,9 @@ int main(const int argc, char *argv[])
 				break;
 			case 't':
 				t = atoi(optarg);
+				break;
+			case 'b':
+				do_bx_format = 1;
 				break;
 			default:
 				print_help_and_exit(argv0, 1);
@@ -185,7 +189,7 @@ int main(const int argc, char *argv[])
 			inputs[j] = strdup(argv[i]);
 		}
 
-		correct(wl, inputs, n_inputs, out, do_h2, 10 * MB, t, nbuckets);
+		correct(wl, inputs, n_inputs, out, do_h2, 10 * MB, do_bx_format, t, nbuckets);
 		return EXIT_SUCCESS;
 	}
 

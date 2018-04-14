@@ -28,6 +28,7 @@ EXTERNC void correct(
 	const char *output_dir,
 	const char do_h2,
 	const size_t buffer_size,
+	const char do_bx_format,
 	const int nthreads,
 	const int nbuckets
 );
