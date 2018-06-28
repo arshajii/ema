@@ -7,7 +7,6 @@
 #include <omp.h>
 
 #include "barcodes.h"
-#include "preprocess.h"
 #include "samdict.h"
 #include "samrecord.h"
 #include "split.h"

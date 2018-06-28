@@ -12,7 +12,6 @@
 #include "samrecord.h"
 #include "align.h"
 #include "barcodes.h"
-#include "preprocess.h"
 #include "util.h"
 #include "main.h"
 
@@ -24,6 +23,7 @@
 int num_threads_per_file = 1;
 int num_threads_for_files = 1;
 char *rg = "@RG\tID:rg1\tSM:sample1";
+char *bx_index = "1";
 char **pg_argv = NULL;
 int pg_argc = 0;
 
@@ -103,6 +103,7 @@ static void print_help_and_exit(const char *argv0, int error)
 	P("  -R <RG string>: full read group string (e.g. '@RG\\tID:foo\\tSM:bar') [none]\n");
 	P("  -d: apply fragment read density optimization [off]\n");
 	P("  -p <platform>: sequencing platform (one of '10x', 'tru', 'cpt') [10x]\n");
+	P("  -i <index>: index to follow 'BX' tag in SAM output [1]");
 	P("  -t <threads>: set number of threads [1]\n");
 	P("  all other arguments (only for -x): list of all preprocessed inputs\n");
 	P("\n");
@@ -240,7 +241,7 @@ int main(const int argc, char *argv[])
 		int t = 1;
 		char c;
 
-		while ((c = getopt(argc-1, &argv[1], "r:1:2:s:xo:R:dp:t:")) != -1) {
+		while ((c = getopt(argc-1, &argv[1], "r:1:2:s:xo:R:dp:i:t:")) != -1) {
 			switch (c) {
 			case 'r':
 				ref = strdup(optarg);
@@ -268,6 +269,9 @@ int main(const int argc, char *argv[])
 				break;
 			case 'p':
 				platform = strdup(optarg);
+				break;
+			case 'i':
+				bx_index = strdup(optarg);
 				break;
 			case 't':
 				t = atoi(optarg);

@@ -53,6 +53,7 @@ align: choose best alignments based on barcodes
   -R <RG string>: full read group string (e.g. '@RG\tID:foo\tSM:bar') [none]
   -d: apply fragment read density optimization [off]
   -p <platform>: sequencing platform (one of '10x', 'tru', 'cpt') [10x]
+  -i <index>: index to follow 'BX' tag in SAM output [1]
   -t <threads>: set number of threads [1]
   all other arguments (only for -x): list of all preprocessed inputs
 

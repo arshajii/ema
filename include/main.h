@@ -13,6 +13,7 @@ void read_fai(FILE *fai_file);
 extern int num_threads_per_file;
 extern int num_threads_for_files;
 extern char *rg;
+extern char *bx_index;
 extern char **pg_argv;
 extern int pg_argc;
 

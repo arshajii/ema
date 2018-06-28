@@ -237,7 +237,7 @@ void print_sam_record(SAMRecord *rec,
 	char bc_str[BC_LEN + 1] = {0};
 	decode_bc(bc, bc_str);
 	if (rec != NULL) {
-		fprintf(out, "\tNM:i:%d\tBX:Z:%s-1\tXG:f:%.5g\tMI:i:%d\tXF:i:%d", r->edit_dist, bc_str, gamma, cloud->id, cloud->bad);
+		fprintf(out, "\tNM:i:%d\tBX:Z:%s-%s\tXG:f:%.5g\tMI:i:%d\tXF:i:%d", r->edit_dist, bc_str, bx_index, gamma, cloud->id, cloud->bad);
 	} else {
 		fprintf(out, "\tBX:Z:%s-1", bc_str);
 	}
