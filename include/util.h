@@ -19,7 +19,7 @@
 #define IS_ACGT(c) ((c) == 'A' || (c) == 'C' || (c) == 'G' || (c) == 'T')
 
 typedef uint32_t bc_t;
-typedef uint8_t chrom_t;
+typedef uint32_t chrom_t;
 
 void copy_until_space(char *dest, char **src);
 char *escape(char *s);
