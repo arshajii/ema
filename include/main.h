@@ -23,7 +23,7 @@ extern PlatformProfile *tech;
 #define DEBUG 0
 #define TRACK_READ ""
 
-#define VERSION "0.6.1"
+#define VERSION "0.6.2"
 
 #define KB 1024
 #define MB (1024 * KB)
