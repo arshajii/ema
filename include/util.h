@@ -4,6 +4,7 @@
 #include <stdlib.h>
 #include <stdint.h>
 #include <stdio.h>
+#include <zlib.h>
 
 #define IOERROR(filename) \
 	do { \
@@ -26,7 +27,7 @@ char *escape(char *s);
 
 bc_t encode_bc(const char *bc);
 void decode_bc(bc_t bc, char *out);
-size_t count_lines(FILE *f);
+size_t count_lines(gzFile f);
 size_t trim_after_space(char *s);
 uint32_t hash_ident(const char *ident);
 

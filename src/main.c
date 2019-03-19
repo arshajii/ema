@@ -307,9 +307,9 @@ int main(const int argc, char *argv[])
 			exit(EXIT_FAILURE);
 		}
 
-		FILE *fq1_file = NULL;
-		FILE *fq2_file = NULL;
-		FILE *fqx_file = NULL;
+		gzFile fq1_file = NULL;
+		gzFile fq2_file = NULL;
+		gzFile fqx_file = NULL;
 		FILE *out_file = (out == NULL ? stdout : fopen(out, "w"));
 
 		if (!out_file) {
@@ -317,20 +317,20 @@ int main(const int argc, char *argv[])
 		}
 
 		if (fqx != NULL) {
-			fqx_file = fopen(fqx, "r");
+			fqx_file = gzopen(fqx, "r");
 
 			if (!fqx_file) {
 				IOERROR(fqx);
 			}
 		} else if (fq1 != NULL) {
-			fq1_file = fopen(fq1, "r");
+			fq1_file = gzopen(fq1, "r");
 
 			if (!fq1_file) {
 				IOERROR(fq1);
 			}
 
 			if (fq2 != NULL) {
-				fq2_file = fopen(fq2, "r");
+				fq2_file = gzopen(fq2, "r");
 
 				if (!fq2_file) {
 					IOERROR(fq2);
@@ -368,13 +368,13 @@ int main(const int argc, char *argv[])
 				exit(EXIT_SUCCESS);
 			}
 
-			FILE **inputs  = safe_malloc(n_inputs * sizeof(*inputs));
+			gzFile *inputs  = safe_malloc(n_inputs * sizeof(*inputs));
 
 			for (int i = optind + 1; i < argc; i++) {
 				const int j = i - (optind + 1);  // w.r.t. `inputs` and `outputs`
 
 				const char *filename = strdup(argv[i]);
-				inputs[j] = fopen(filename, "r");
+				inputs[j] = gzopen(filename, "r");
 
 				if (!inputs[j]) {
 					IOERROR(filename);
@@ -388,7 +388,7 @@ int main(const int argc, char *argv[])
 			#pragma omp parallel for num_threads(num_threads_for_files)
 			for (size_t i = 0; i < n_inputs; i++) {
 				find_clouds_and_align(NULL, NULL, inputs[i], out_file, apply_opt, NULL, &out_lock);
-				fclose(inputs[i]);
+				gzclose(inputs[i]);
 			}
 
 			omp_destroy_lock(&out_lock);
@@ -399,9 +399,9 @@ int main(const int argc, char *argv[])
 
 			find_clouds_and_align(fq1_file, fq2_file, fqx_file, out_file, apply_opt, NULL, NULL);
 
-			if (fq1_file) fclose(fq1_file);
-			if (fq2_file && fq2_file != fq1_file) fclose(fq2_file);
-			if (fqx_file) fclose(fqx_file);
+			if (fq1_file) gzclose(fq1_file);
+			if (fq2_file && fq2_file != fq1_file) gzclose(fq2_file);
+			if (fqx_file) gzclose(fqx_file);
 		}
 
 		fclose(out_file);

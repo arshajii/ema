@@ -68,14 +68,14 @@ void decode_bc(bc_t bc, char *out)
 	}
 }
 
-size_t count_lines(FILE *f)
+size_t count_lines(gzFile f)
 {
 	size_t lines = 0;
-	while (!feof(f)) {
-		if (fgetc(f) == '\n')
+	while (!gzeof(f)) {
+		if (gzgetc(f) == '\n')
 			++lines;
 	}
-	rewind(f);
+	gzrewind(f);
 	return lines + 1;
 }
 

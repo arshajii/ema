@@ -142,15 +142,15 @@ static void normalize_cloud_probabilities(Cloud *clouds, const size_t nc)
 	}
 }
 
-static void read_special_fastq(FILE *fq, FASTQRecord **fq1_recs, FASTQRecord **fq2_recs);
+static void read_special_fastq(gzFile fq, FASTQRecord **fq1_recs, FASTQRecord **fq2_recs);
 
-static int read_fastq_rec_bc_group(FILE *in,
+static int read_fastq_rec_bc_group(gzFile in,
                                    FASTQRecord *start,
                                    FASTQRecord **out,
                                    size_t *n_recs,
                                    size_t *out_cap);
 
-static int read_fastq_rec_bc_group_interleaved(FILE *in,
+static int read_fastq_rec_bc_group_interleaved(gzFile in,
                                                FASTQRecord *start1,
                                                FASTQRecord **out1,
                                                size_t *n_recs1,
@@ -211,9 +211,9 @@ void write_sam_header(FILE *out_file)
 	fprintf(out_file, "\n");
 }
 
-void find_clouds_and_align(FILE *fq1,
-                           FILE *fq2,
-                           FILE *fqx,
+void find_clouds_and_align(gzFile fq1,
+                           gzFile fq2,
+                           gzFile fqx,
                            FILE *out_file,
                            const int apply_opt,
                            omp_lock_t *in_lock,
@@ -630,23 +630,23 @@ static bc_t get_bc_direct(FASTQRecord *rec)
 	return tech->extract_bc(rec);
 }
 
-static int read_fastq_rec(FILE *in, FASTQRecord *out)
+static int read_fastq_rec(gzFile in, FASTQRecord *out)
 {
 	char sep[256];
 
-	if (!fgets(out->id, sizeof(out->id), in))
+	if (!gzgets(out->id, sizeof(out->id), in))
 		return 1;
 
-	assert(fgets(out->read, sizeof(out->read), in));
-	assert(fgets(sep, sizeof(sep), in));
-	assert(fgets(out->qual, sizeof(out->qual), in));
+	assert(gzgets(out->read, sizeof(out->read), in));
+	assert(gzgets(sep, sizeof(sep), in));
+	assert(gzgets(out->qual, sizeof(out->qual), in));
 
 	out->bc = get_bc_direct(out);
 	out->rlen = strlen(out->read) - 1;  // -1 because of newline
 	return 0;
 }
 
-static int read_fastq_rec_bc_group(FILE *in,
+static int read_fastq_rec_bc_group(gzFile in,
                                    FASTQRecord *start,
                                    FASTQRecord **out,
                                    size_t *n_recs,
@@ -680,7 +680,7 @@ static int read_fastq_rec_bc_group(FILE *in,
 	} while (1);
 }
 
-static int read_fastq_rec_bc_group_interleaved(FILE *in,
+static int read_fastq_rec_bc_group_interleaved(gzFile in,
                                                FASTQRecord *start1,
                                                FASTQRecord **out1,
                                                size_t *n_recs1,
@@ -752,7 +752,7 @@ static int special_fastq_record_cmp(const void *v1, const void *v2)
 	return strncmp(c1, c2, BC_LEN);
 }
 
-static void read_special_fastq(FILE *fq, FASTQRecord **fq1_recs, FASTQRecord **fq2_recs)
+static void read_special_fastq(gzFile fq, FASTQRecord **fq1_recs, FASTQRecord **fq2_recs)
 {
 	char bc_str[BC_LEN + 1];
 	char buf[5000];
@@ -760,7 +760,7 @@ static void read_special_fastq(FILE *fq, FASTQRecord **fq1_recs, FASTQRecord **f
 	char **records = safe_malloc(n_records_actual * sizeof(*records));
 	size_t n_records = 0;
 
-	while (fgets(buf, sizeof(buf), fq)) {
+	while (gzgets(buf, sizeof(buf), fq)) {
 		char *record = safe_malloc(strlen(buf) + 1);
 		strcpy(record, buf);
 		records[n_records++] = record;

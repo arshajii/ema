@@ -5,6 +5,7 @@
 #include <stdint.h>
 #include <stdio.h>
 
+#include <zlib.h>
 #include <omp.h>
 
 void bwa_init(const char *ref_path);
@@ -12,9 +13,9 @@ void bwa_dealloc(void);
 
 void write_sam_header(FILE *out_file);
 
-void find_clouds_and_align(FILE *fq1,
-                           FILE *fq2,
-                           FILE *fqx,
+void find_clouds_and_align(gzFile fq1,
+                           gzFile fq2,
+                           gzFile fqx,
                            FILE *out_file,
                            const int apply_opt,
                            omp_lock_t *in_lock,

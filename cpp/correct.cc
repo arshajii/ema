@@ -14,6 +14,7 @@
 
 #include <fcntl.h>
 #include <unistd.h>
+#include <zlib.h>
 
 #include "common.h"
 
@@ -220,7 +221,7 @@ void load_and_correct_full_count(const string &path,
 
 	FILE *f = fopen(path.c_str(), "rb");
 	die_if(f == NULL, "Cannot open file {}", path);
-
+	
 	int64_t total, dump = 0;
 	size_t c;
 	string b = string(BC_LEN, '#');
@@ -351,13 +352,13 @@ EXTERNC void correct(
 	}
 	struct PQFile {
 		int64_t size; // current size
-		FILE *file;
+		gzFile file;
 		char *buf;
 		size_t buf_size;
 	};
 	vector<PQFile> files { PQFile { // Non-bucketed reads
 		.size = 0,
-		.file = fopen(fmt::format("{}/ema-nobc", output_dir).c_str(), "wb"),
+		.file = gzopen(fmt::format("{}/ema-nobc", output_dir).c_str(), "wb"),
 		.buf = (char*)malloc(buffer_size + 10 * KB),
 		.buf_size = 0
 	}};
@@ -372,7 +373,7 @@ EXTERNC void correct(
 	for (int i = 0; i < nbuckets; i++) {
 		files.push_back({
 			.size = 0,
-			.file = fopen(fmt::format("{}/ema-bin-{:03}", output_dir, i).c_str(), "wb"),
+			.file = gzopen(fmt::format("{}/ema-bin-{:03}", output_dir, i).c_str(), "wb"),
 			.buf = (char*)malloc(buffer_size + 10 * KB),
 			.buf_size = 0
 		});
@@ -533,7 +534,7 @@ EXTERNC void correct(
 		buff[buffi++] = '\n';
 
 		if (buffi >= buffer_size) {
-			fwrite(buff, 1, buffi, files[fidx].file);
+			gzwrite(files[fidx].file, buff, buffi);
 			buffi = 0;
 		}
 
@@ -546,8 +547,8 @@ EXTERNC void correct(
 	}
 	eprn("\r:: [{}] {:n} out of {:n} ({:.2f}%)", string(50, '='), current, total, 100.0);
 	for (int fidx = 0; fidx < files.size(); fidx++) {
-		fwrite(files[fidx].buf, 1, files[fidx].buf_size, files[fidx].file);
-		fclose(files[fidx].file);
+		gzwrite(files[fidx].file, files[fidx].buf, files[fidx].buf_size);
+		gzclose(files[fidx].file);
 		free(files[fidx].buf);
 	}
 	eprn("Writing barcodes ... done in {:.1f} s", elapsed(T)); T = cur_time();
