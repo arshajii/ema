@@ -29,7 +29,7 @@ int pg_argc = 0;
 
 PlatformProfile *tech;
 
-#define MAX_CHROM_NAME_LEN 64
+#define MAX_CHROM_NAME_LEN 256
 static struct { char chrom_name[MAX_CHROM_NAME_LEN]; } *chroms;
 
 char *chrom_lookup(const chrom_t chrom)
