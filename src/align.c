@@ -259,8 +259,9 @@ void find_clouds_and_align(gzFile fq1,
 	#pragma omp parallel num_threads(num_threads_per_file)
 	{
 		arena_init();
+		const size_t max_clouds = (tech->many_clouds ? MAX_CLOUDS_PER_BC_LARGE : MAX_CLOUDS_PER_BC_SMALL);
 		size_t nc = 0;
-		Cloud *clouds = safe_malloc((tech->many_clouds ? MAX_CLOUDS_PER_BC_LARGE : MAX_CLOUDS_PER_BC_SMALL) * sizeof(*clouds));
+		Cloud *clouds = safe_malloc(max_clouds * sizeof(*clouds));
 		SAMDict *sd = sam_dict_new();
 
 #define INIT_FASTQ_CAP 5000
@@ -354,6 +355,7 @@ void find_clouds_and_align(gzFile fq1,
 			/* find and process clouds */
 			while (record->bc == bc) {
 				SAMRecord *r = record;
+				assert(nc < max_clouds);
 				Cloud *c = &clouds[nc];
 
 				init_cloud(c);

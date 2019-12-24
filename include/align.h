@@ -53,7 +53,7 @@ int is_pair_relaxed(struct sam_record *r1, struct sam_record *r2);
 #define EM_ITERS 5
 
 /* reasonable clouds/barcode upper bound */
-#define MAX_CLOUDS_PER_BC_SMALL   100000
+#define MAX_CLOUDS_PER_BC_SMALL  1000000
 #define MAX_CLOUDS_PER_BC_LARGE 10000000
 
 /* lengths */
