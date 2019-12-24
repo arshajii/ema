@@ -358,7 +358,7 @@ EXTERNC void correct(
 	};
 	vector<PQFile> files { PQFile { // Non-bucketed reads
 		.size = 0,
-		.file = gzopen(fmt::format("{}/ema-nobc", output_dir).c_str(), "wb"),
+		.file = gzopen(fmt::format("{}/ema-nobc", output_dir).c_str(), "wb1"),
 		.buf = (char*)malloc(buffer_size + 10 * KB),
 		.buf_size = 0
 	}};
@@ -373,7 +373,7 @@ EXTERNC void correct(
 	for (int i = 0; i < nbuckets; i++) {
 		files.push_back({
 			.size = 0,
-			.file = gzopen(fmt::format("{}/ema-bin-{:03}", output_dir, i).c_str(), "wb"),
+			.file = gzopen(fmt::format("{}/ema-bin-{:03}", output_dir, i).c_str(), "wb1"),
 			.buf = (char*)malloc(buffer_size + 10 * KB),
 			.buf_size = 0
 		});
