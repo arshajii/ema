@@ -1,12 +1,12 @@
 TARGET = ema
 LIBS = -L$(BWADIR) -lbwa -lm -lz -lpthread
-CC = gcc
+#CC = gcc
 WARNINGS = -Wall -Wextra
-CFLAGS = -std=gnu99 -march=native -O3 -fopenmp -flto -fstrict-aliasing $(WARNINGS)
-LFLAGS = -lstdc++ -march=native -O3 -flto -fopenmp -lpthread
+CFLAGS = -std=gnu99 -march=x86-64 -O3 -fopenmp -flto -fstrict-aliasing -isystem ~/anaconda3/include $(WARNINGS)
+LFLAGS = -L ~/anaconda3/lib -lstdc++ -march=x86-64 -O3 -flto -fopenmp -lpthread
 
-CXX = g++
-CPPFLAGS = -c -std=c++11 -O3 -march=native -pthread
+#CXX = g++
+CPPFLAGS = -c -std=c++11 -O3 -march=x86-64 -pthread
 LDFLAGS = -pthread
 
 #CFLAGS = -std=gnu99 -fstrict-aliasing -fopenmp -ggdb -O0 $(WARNINGS)
