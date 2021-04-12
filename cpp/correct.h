@@ -30,5 +30,6 @@ EXTERNC void correct(
 	const size_t buffer_size,
 	const char do_bx_format,
 	const int nthreads,
-	const int nbuckets
+	const int nbuckets,
+	const int is_haplotag
 );

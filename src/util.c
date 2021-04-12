@@ -38,7 +38,7 @@ char *escape(char *s)  // adapted from BWA
 	return s;
 }
 
-bc_t encode_bc(const char *bc)
+bc_t encode_bc_default(const char *bc)
 {
 #define BC_ADD_BASE(x) (encoded_bc |= (x))
 
@@ -60,12 +60,38 @@ bc_t encode_bc(const char *bc)
 #undef BC_ADD_BASE
 }
 
-void decode_bc(bc_t bc, char *out)
+bc_t encode_bc_haptag(const char *bc)
+{
+#define CharToInt(c) ((c) - '0')
+#define TwoCharToInt(s) ((10 * CharToInt(s[0])) + CharToInt(s[1])) 
+#define PackHaplotagString(s) PackHaplotag(TwoCharToInt((s+1)),TwoCharToInt((s+7)),TwoCharToInt((s+4)),TwoCharToInt((s+10)))
+#define PackHaplotag(a,b,c,d) ((((uint32_t)(a)) << 24) | (((uint32_t)(c)) << 16) | (((uint32_t)(b)) << 8) | (uint32_t)(d))
+	return (bc_t)PackHaplotagString(bc);
+}
+
+bc_t encode_bc(const char *bc, const int is_haplotag)
+{
+	if (is_haplotag) return encode_bc_haptag(bc);
+	else return encode_bc_default(bc);
+}
+
+void decode_bc_default(bc_t bc, char *out)
 {
 	for (int i = 0; i < BC_LEN; i++) {
 		out[i] = "ACGT"[bc & 0x3];
 		bc >>= 2;
 	}
+}
+
+void decode_bc_haptag(bc_t bc, char *out)
+{
+	sprintf(out, "A%02uC%02uB%02uD%02u", (bc >> 24) & 127, (bc >> 16) & 127, (bc >> 8) & 127, bc & 127);
+}
+
+void decode_bc(bc_t bc, char *out, const int is_haplotag)
+{
+	if (is_haplotag) decode_bc_haptag(bc, out);
+	else decode_bc_default(bc, out);
 }
 
 size_t count_lines(FILE *f)

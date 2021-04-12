@@ -2,6 +2,19 @@
 #include <string.h>
 #include "techs.h"
 
+static bc_t extract_bc_haptag(FASTQRecord *rec)
+{
+	char *bc_str = strrchr(rec->id, ':');
+	assert(bc_str != NULL);
+	*bc_str = '\0';
+
+	char *space = strchr(rec->id, ' ');  // for Long Ranger formatted FASTQs
+	if (space != NULL)
+		*space = '\0';
+
+	return encode_bc(&bc_str[1], 1);
+}
+
 static bc_t extract_bc_10x(FASTQRecord *rec)
 {
 	char *bc_str = strrchr(rec->id, ':');
@@ -12,7 +25,7 @@ static bc_t extract_bc_10x(FASTQRecord *rec)
 	if (space != NULL)
 		*space = '\0';
 
-	return encode_bc(&bc_str[1]);
+	return encode_bc(&bc_str[1], 0);
 }
 
 static bc_t extract_bc_truseq(FASTQRecord *rec)
@@ -30,6 +43,14 @@ static bc_t extract_bc_cptseq(FASTQRecord *rec)
 }
 
 static PlatformProfile profiles[] = {
+	{.name = "haptag",
+	 .extract_bc = extract_bc_haptag,
+	 .many_clouds = 0,
+	 .dist_thresh = 50000,
+	 .error_rate = 0.001,
+	 .n_density_probs = 4,
+	 .density_probs = {0.6, 0.05, 0.2, 0.01}},
+	
 	{.name = "10x",
 	 .extract_bc = extract_bc_10x,
 	 .many_clouds = 0,
