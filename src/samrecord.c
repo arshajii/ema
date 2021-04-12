@@ -104,7 +104,8 @@ static inline char rc(const char c)
 void print_sam_record(SAMRecord *rec,
                       SAMRecord *mate,
                       FILE *out,
-                      const char *rg_id)
+                      const char *rg_id,
+		      const int is_haplotag)
 {
 	assert(rec != NULL || mate != NULL);
 	int flag = SAM_READ_PAIRED;
@@ -234,14 +235,27 @@ void print_sam_record(SAMRecord *rec,
 	}
 
 	// tags
-	char bc_str[BC_LEN + 1] = {0};
-	decode_bc(bc, bc_str);
-	if (rec != NULL) {
-		fprintf(out, "\tNM:i:%d\tBX:Z:%s-%s\tXG:f:%.5g\tMI:i:%d\tXF:i:%d", r->edit_dist, bc_str, bx_index, gamma, cloud->id, cloud->bad);
-	} else {
-		fprintf(out, "\tBX:Z:%s-1", bc_str);
+	if (is_haplotag)
+	{
+		char bc_str[13] = {0};
+		decode_bc(bc, bc_str, 1);
+		if (rec != NULL) {
+			fprintf(out, "\tNM:i:%d\tBX:Z:%s\tXG:f:%.5g\tMI:i:%d\tXF:i:%d", r->edit_dist, bc_str, gamma, cloud->id, cloud->bad);
+		} else {
+			fprintf(out, "\tBX:Z:%s", bc_str);
+		}
 	}
-
+	else
+	{
+		char bc_str[BC_LEN + 1] = {0};
+		decode_bc(bc, bc_str, 0);
+		if (rec != NULL) {
+			fprintf(out, "\tNM:i:%d\tBX:Z:%s-%s\tXG:f:%.5g\tMI:i:%d\tXF:i:%d", r->edit_dist, bc_str, bx_index, gamma, cloud->id, cloud->bad);
+		} else {
+			fprintf(out, "\tBX:Z:%s-1", bc_str);
+		}
+	}
+	
 	if (rg_id != NULL) {
 		fprintf(out, "\tRG:Z:");
 		for (size_t i = 0; rg_id[i] != '\0' && !isspace(rg_id[i]); i++)

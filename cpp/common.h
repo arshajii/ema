@@ -65,6 +65,12 @@ const size_t KB = 1024;
 const size_t MB = 1024 * KB;
 const size_t GB = 1024 * MB;
 
+#define CharToInt(c) ((c) - '0')
+#define TwoCharToInt(s) ((10 * CharToInt(s[0])) + CharToInt(s[1])) 
+#define PackHaplotagString(s) PackHaplotag(TwoCharToInt(s.substr(1,2)),TwoCharToInt(s.substr(7,2)),TwoCharToInt(s.substr(4,2)),TwoCharToInt(s.substr(10,2)))
+#define PackHaplotag(a,b,c,d) ((((uint32_t)(a)) << 24) | (((uint32_t)(c)) << 16) | (((uint32_t)(b)) << 8) | (uint32_t)(d))
+#define GenerateAllHaplotagBC(map) for(uint32_t a = 1; a <= 96; ++a) for(uint32_t b = 1; b <= 96; ++b) for(uint32_t c = 1; c <= 96; ++c) for(uint32_t d = 1; d <= 96; ++d) map[PackHaplotag(a,b,c,d)] = 0
+#define GenerateAllHaplotagBC_Field(map,f) for(uint32_t a = 1; a <= 96; ++a) for(uint32_t b = 1; b <= 96; ++b) for(uint32_t c = 1; c <= 96; ++c) for(uint32_t d = 1; d <= 96; ++d) map[PackHaplotag(a,b,c,d)].f = 0
 /******************************************************************************/
 
 inline char hash_dna(char c)

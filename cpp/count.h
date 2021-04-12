@@ -19,5 +19,6 @@
 EXTERNC void count(
 	const char *known_barcodes_path,
 	const char *output_prefix,
-	const size_t max_map_size
+	const size_t max_map_size,
+	const int is_haplotag
 );

@@ -38,7 +38,8 @@ void dump_map(map<string, int64_t> &full_counts, FILE *fo)
 EXTERNC void count(
 	const char *known_barcodes_path,
 	const char *output_prefix,
-	const size_t max_map_size)
+	const size_t max_map_size,
+	const int is_haplotag)
 {
 	auto TOT = cur_time();
 
@@ -46,22 +47,34 @@ EXTERNC void count(
 	map<string, int64_t> full_counts;
 
 	string s, q;
-
-	auto T = cur_time();
-	ifstream fin(known_barcodes_path);
-	die_if(fin.fail(), "Cannot open file {}", known_barcodes_path);
 	uint32_t barcode;
-	while (getline(fin, s)) {
-		barcode = 0;
-		DO(BC_LEN) barcode = (barcode << 2) | hash_dna(s[_]);
-		die_if(barcode == 0, "Invalid barcode AAA...AA whitelisted");
-		counts[barcode] = 0;
+	auto T = cur_time();
+	
+	if (!is_haplotag)
+	{
+		ifstream fin(known_barcodes_path);
+		die_if(fin.fail(), "Cannot open file {}", known_barcodes_path);
+		while (getline(fin, s)) {
+			barcode = 0;
+			DO(BC_LEN) barcode = (barcode << 2) | hash_dna(s[_]);
+			die_if(barcode == 0, "Invalid barcode AAA...AA whitelisted");
+			counts[barcode] = 0;
+		}
+		fin.close();
+		eprn(":: Loading 10X took {:.1f} s", elapsed(T)); T = cur_time();
 	}
-	fin.close();
-	eprn(":: Loading 10X took {:.1f} s", elapsed(T)); T = cur_time();
+	else
+	{
+		GenerateAllHaplotagBC(counts);
+	}
 
-	FILE *f_full = fopen(fmt::format("{}.ema-fcnt", output_prefix).c_str(), "wb");
-	die_if(f_full == NULL, "Cannot open file {}", fmt::format("{}.ema-fcnt", output_prefix));
+	FILE *f_full;
+	if (!is_haplotag)
+	{
+		f_full = fopen(fmt::format("{}.ema-fcnt", output_prefix).c_str(), "wb");
+		die_if(f_full == NULL, "Cannot open file {}", fmt::format("{}.ema-fcnt", output_prefix));
+	}
+
 	FILE *f_nice = fopen(fmt::format("{}.ema-ncnt", output_prefix).c_str(), "wb");
 	die_if(f_nice == NULL, "Cannot open file {}", fmt::format("{}.ema-ncnt", output_prefix));
 
@@ -72,31 +85,53 @@ EXTERNC void count(
 	int64_t sz = 0;
 	while (getline(cin, s)) { // N R1 Q1 R2 Q2
 		sz += s.size() + 1;
+		
+		bool bx = false;
+		if (is_haplotag)
+		{
+			size_t bx_start = s.find_first_of(" \t");
+			if (bx_start != string::npos)
+			{
+				bx_start = s.find("BX:Z:", bx_start);
+				if (bx_start != string::npos && (bx_start + 16) < s.size())
+				{
+					string haplotag_bc = s.substr (bx_start + 5, 12);
+					barcode = PackHaplotagString(haplotag_bc);
+					bx = true;
+				}
+			}
+		}
+		else bx = true;
+
 		getline(cin, s); sz += s.size() + 1;
 		getline(cin, q); sz += q.size() + 1;
 		getline(cin, q); sz += q.size() + 1;
 
-		bool process = s.size() >= MIN_READ_SIZE;
-
+		bool process = bx && (s.size() >= MIN_READ_SIZE);
 		bool has_n = 0;
-		barcode = 0;
-		if (process) DO(BC_LEN) { // 0..33 34..
-			//die_if((s[_] == 'N' && q[_] != '#') || (s[_] != 'N' && q[_] == '#'), 
-			//	"# quality score does not match N ({} vs. {})", s[_], q[_]);
-			if (q[_] < ILLUMINA_QUAL_OFFSET) {
-				process = false;
-				eprn("Ignoring long read--- quality score {} less than {}", q, ILLUMINA_QUAL_OFFSET);
-				break;
-			}
-			if (q[_] - ILLUMINA_QUAL_OFFSET >= QUAL_BASE) {
-				//eprn("Trimming quality score {} to {}", q[_], char(ILLUMINA_QUAL_OFFSET + QUAL_BASE - 1));
-				q[_] = ILLUMINA_QUAL_OFFSET + QUAL_BASE - 1;
-			}
+		
+		if (!is_haplotag)
+		{
+			barcode = 0;
+			if (process) DO(BC_LEN) { // 0..33 34..
+				//die_if((s[_] == 'N' && q[_] != '#') || (s[_] != 'N' && q[_] == '#'), 
+				//	"# quality score does not match N ({} vs. {})", s[_], q[_]);
+				if (q[_] < ILLUMINA_QUAL_OFFSET) {
+					process = false;
+					eprn("Ignoring long read--- quality score {} less than {}", q, ILLUMINA_QUAL_OFFSET);
+					break;
+				}
+				if (q[_] - ILLUMINA_QUAL_OFFSET >= QUAL_BASE) {
+					//eprn("Trimming quality score {} to {}", q[_], char(ILLUMINA_QUAL_OFFSET + QUAL_BASE - 1));
+					q[_] = ILLUMINA_QUAL_OFFSET + QUAL_BASE - 1;
+				}
 
-			b[_] = hash_dna_n(s[_]) * QUAL_BASE + min(QUAL_BASE - 1, q[_] - ILLUMINA_QUAL_OFFSET);
-			barcode = (barcode << 2) | hash_dna(s[_]);
-			has_n |= (s[_] == 'N');
+				b[_] = hash_dna_n(s[_]) * QUAL_BASE + min(QUAL_BASE - 1, q[_] - ILLUMINA_QUAL_OFFSET);
+				barcode = (barcode << 2) | hash_dna(s[_]);
+				has_n |= (s[_] == 'N');
+			}
 		}
+		
 		if (process) {
 			if (!has_n) {
 				auto it = counts.find(barcode);
@@ -134,9 +169,12 @@ EXTERNC void count(
 	}
 	fclose(f_nice);
 
-	dump_map(full_counts, f_full);
-	fclose(f_full);
-	eprn(":: Printing took {:.1f} s", elapsed(T)); T = cur_time();
+	if (!is_haplotag)
+	{
+		dump_map(full_counts, f_full);
+		fclose(f_full);
+		eprn(":: Printing took {:.1f} s", elapsed(T)); T = cur_time();
+	}
 
 	eprn(":: Processed {:n} reads ({:n} MB uncompressed) in {:n} s",
 		total_reads,

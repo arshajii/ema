@@ -142,7 +142,7 @@ static void normalize_cloud_probabilities(Cloud *clouds, const size_t nc)
 	}
 }
 
-static void read_special_fastq(FILE *fq, FASTQRecord **fq1_recs, FASTQRecord **fq2_recs);
+static void read_special_fastq(FILE *fq, FASTQRecord **fq1_recs, FASTQRecord **fq2_recs, const int is_haplotag);
 
 static int read_fastq_rec_bc_group(FILE *in,
                                    FASTQRecord *start,
@@ -252,8 +252,10 @@ void find_clouds_and_align(FILE *fq1,
 	FASTQRecord *latest_fqr2 = NULL;
 	size_t latest_n2 = 0;
 
+	const int is_haplotag = !strcmp(tech->name, "haptag");
+	
 	if (!STANDARD_FASTQ())
-		read_special_fastq(fqx, &fq1_recs_full, &fq2_recs_full);
+		read_special_fastq(fqx, &fq1_recs_full, &fq2_recs_full, is_haplotag);
 
 	fprintf(stderr, "Processing reads...\n");
 	#pragma omp parallel num_threads(num_threads_per_file)
@@ -594,8 +596,8 @@ void find_clouds_and_align(FILE *fq1,
 
 				{
 					omp_set_lock(out_lock);
-					print_sam_record(best, best_mate, out_file, rg_id);
-					print_sam_record(best_mate, best, out_file, rg_id);
+					print_sam_record(best, best_mate, out_file, rg_id, is_haplotag);
+					print_sam_record(best_mate, best, out_file, rg_id, is_haplotag);
 					omp_unset_lock(out_lock);
 				}
 			}
@@ -754,7 +756,7 @@ static int special_fastq_record_cmp(const void *v1, const void *v2)
 	return strncmp(c1, c2, BC_LEN);
 }
 
-static void read_special_fastq(FILE *fq, FASTQRecord **fq1_recs, FASTQRecord **fq2_recs)
+static void read_special_fastq(FILE *fq, FASTQRecord **fq1_recs, FASTQRecord **fq2_recs, const int is_haplotag)
 {
 	char bc_str[BC_LEN + 1];
 	char buf[5000];
@@ -776,7 +778,7 @@ static void read_special_fastq(FILE *fq, FASTQRecord **fq1_recs, FASTQRecord **f
 	for (size_t i = 0; i < n_records; i++) {
 		char *p = records[i];
 		copy_until_space(bc_str, &p);
-		const bc_t bc = encode_bc(bc_str);
+		const bc_t bc = encode_bc(bc_str, is_haplotag);
 
 		FASTQRecord *fq1 = &(*fq1_recs)[i];
 		FASTQRecord *fq2 = &(*fq2_recs)[i];

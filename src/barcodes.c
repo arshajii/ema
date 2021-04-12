@@ -37,7 +37,7 @@ void wl_read(BarcodeDict *bcdict, const char *whitelist_path)
 		if (strchr(buf, '#'))
 			continue;
 
-		whitelist[wl_size].bc = encode_bc(buf);
+		whitelist[wl_size].bc = encode_bc(buf, 0);
 		whitelist[wl_size].count = 0;
 		++wl_size;
 	}
