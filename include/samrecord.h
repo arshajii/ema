@@ -9,7 +9,7 @@
 typedef struct fastq_record {
 	bc_t bc;
 	unsigned short rlen;
-	char id[100];
+	char id[150];
 	char read[MAX_READ_LEN+2];  // +2 for newline and null-term
 	char qual[MAX_READ_LEN+2];
 } FASTQRecord;
