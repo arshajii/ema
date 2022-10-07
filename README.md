@@ -1,6 +1,6 @@
 EMA: An aligner for barcoded short-read sequencing data
 =======================================================
-[![Build Status](https://travis-ci.org/arshajii/ema.svg?branch=master)](https://travis-ci.org/arshajii/ema) [![License](https://img.shields.io/badge/license-MIT-blue.svg)](https://raw.githubusercontent.com/arshajii/ema/master/LICENSE) [![Mentioned in Awesome 10x Genomics](https://awesome.re/mentioned-badge.svg)](https://github.com/johandahlberg/awesome-10x-genomics)
+[![Build Status](https://github.com/arshajii/ema/actions/workflows/ci.yml/badge.svg) [![License](https://img.shields.io/badge/license-MIT-blue.svg)](https://raw.githubusercontent.com/arshajii/ema/master/LICENSE) [![Mentioned in Awesome 10x Genomics](https://awesome.re/mentioned-badge.svg)](https://github.com/johandahlberg/awesome-10x-genomics)
 
 EMA uses a latent variable model to align barcoded short-reads (such as those produced by [10x Genomics](https://www.10xgenomics.com)' sequencing platform). More information is available in [our paper](https://www.biorxiv.org/content/early/2017/11/16/220236). The full experimental setup is available [here](https://github.com/arshajii/ema-paper-data/blob/master/experiments.ipynb).
 
