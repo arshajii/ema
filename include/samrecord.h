@@ -63,7 +63,8 @@ struct xa;
 void print_sam_record(SAMRecord *rec,
                       SAMRecord *mate,
                       FILE *out,
-                      const char *rg_id);
+                      const char *rg_id,
+		      const int is_haplotag);
 
 /* SAM specs */
 #define SAM_NUM_FIELDS 11

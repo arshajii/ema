@@ -189,7 +189,7 @@ void correct_barcode(int start, int end, int thread,
 
 /******************************************************************************/
 
-void load_barcode_count(const string &path, unordered_map<uint32_t, Count> &counts)
+void load_barcode_count(const string &path, unordered_map<uint32_t, Count> &counts, int is_haplotag)
 {
 	eprn(":: Loading known counts file {} ... ", path);
 	FILE *f = fopen(path.c_str(), "rb");
@@ -204,7 +204,8 @@ void load_barcode_count(const string &path, unordered_map<uint32_t, Count> &coun
 		int64_t cnt;
 		c = fread(&cnt, 8, 1, f);
 		die_if(c != 1, "fread failed (corrupted input?)");
-		counts[bcd].prior += cnt;
+		if (is_haplotag) counts[bcd].n_reads += cnt;
+		else counts[bcd].prior += cnt;
 	}
 	fclose(f);
 }
@@ -276,7 +277,8 @@ EXTERNC void correct(
 	const size_t buffer_size,
 	const char do_bx_format,
 	const int nthreads,
-	const int nbuckets)
+	const int nbuckets,
+	const int is_haplotag)
 {
 	auto T = cur_time();
 	initialize_probs();
@@ -286,61 +288,81 @@ EXTERNC void correct(
 /// 1. Load known counts
 	unordered_map<uint32_t, Count> known_counts;
 	string s, q, n, r;
-	ifstream fin(known_barcodes_path);
-	die_if(fin.fail(), "Cannot open file {}", known_barcodes_path);
-	while (getline(fin, s)) {
-		uint32_t barcode = 0;
-		DO(BC_LEN) barcode = (barcode << 2) | hash_dna(s[_]);
-		die_if(barcode == 0, "Invalid barcode AAA...AA whitelisted");
-		known_counts[barcode].prior = 0;
+	if (!is_haplotag)
+	{
+		ifstream fin(known_barcodes_path);
+		die_if(fin.fail(), "Cannot open file {}", known_barcodes_path);
+		while (getline(fin, s)) {
+			uint32_t barcode = 0;
+			DO(BC_LEN) barcode = (barcode << 2) | hash_dna(s[_]);
+			die_if(barcode == 0, "Invalid barcode AAA...AA whitelisted");
+			known_counts[barcode].prior = 0;
+		}
+		fin.close();
 	}
-	fin.close();
-
+	else GenerateAllHaplotagBC_Field(known_counts,prior);
+	
 	for (int fi = 0; fi < input_prefix_size; fi++) {
 		string s = input_prefix[fi];
 		die_if(stat_dir(s) != 2, "{} is not a file", s);
 		// eprn("--> {}", s.substr(s.size() - 8));
 		die_if(s.size() < 9 || s.substr(s.size() - 9) != ".ema-ncnt", "{} is not an ema-ncnt file", s);
-		s[s.size() - 4] = 'f';
-		die_if(stat_dir(s) != 2, "{} is not a file", s);
+		if (!is_haplotag)
+		{
+			s[s.size() - 4] = 'f';
+			die_if(stat_dir(s) != 2, "{} is not a file", s);
+		}
 	}
 
+	size_t total = 0;
 	for (int fi = 0; fi < input_prefix_size; fi++) {
-		load_barcode_count(fmt::format("{}", input_prefix[fi]), known_counts);
+		load_barcode_count(fmt::format("{}", input_prefix[fi]), known_counts, is_haplotag);
 	}
-	double total_counts = 0;
-	for (auto &c: known_counts) {
-		total_counts += c.second.prior + 1;
+	if (!is_haplotag)
+	{
+		double total_counts = 0;
+		for (auto &c: known_counts) {
+			total_counts += c.second.prior + 1;
+		}
+		for (auto &c: known_counts) {
+			c.second.prior = (c.second.prior + 1) / total_counts;
+		}
 	}
-	for (auto &c: known_counts) {
-		c.second.prior = (c.second.prior + 1) / total_counts;
+	else
+	{
+		for (auto &cnt: known_counts) {
+			total += cnt.second.n_reads;
+		}
 	}
 	eprn(":: Loading known counts ... done in {:.1f} s", elapsed(T)); T = cur_time();
 
 /// 2. Load and correct full counts
+	
 	unordered_map<string, uint32_t> corrected_counts;
-	vector<int64_t> stats(4, 0);
-	for (int fi = 0; fi < input_prefix_size; fi++) {
-		s = input_prefix[fi];
-		s[s.size() - 4] = 'f';
-		load_and_correct_full_count(
-			fmt::format("{}", s),
-			known_counts,
-			corrected_counts,
-			stats,
-			do_h2,
-			nthreads
-		);
+	if (!is_haplotag)
+	{
+		vector<int64_t> stats(4, 0);
+		for (int fi = 0; fi < input_prefix_size; fi++) {
+			s = input_prefix[fi];
+			s[s.size() - 4] = 'f';
+			load_and_correct_full_count(
+					fmt::format("{}", s),
+					known_counts,
+					corrected_counts,
+					stats,
+					do_h2,
+					nthreads
+					);
+		}
+		eprn(":: Stats: no change: {:n} \n"
+				"         no barcode: {:n} \n"
+				"       H1-corrected: {:n} \n"
+				"       H2-corrected: {:n} ",
+				stats[NOCHANGE], stats[NOBUCKET], stats[H1CHANGE], stats[H2CHANGE]);
+		total = stats[NOCHANGE] + stats[NOBUCKET] + stats[H1CHANGE] + stats[H2CHANGE];
+		eprn(":: Corrected map size: {:n} (~ {:n} MB)", corrected_counts.size(), estimate_size(corrected_counts) / MB);
+		eprn(":: Correcting barcodes ... done in {:.1f} s", elapsed(T)); T = cur_time();
 	}
-	eprn(":: Stats: no change: {:n} \n"
-		 "         no barcode: {:n} \n"
-		 "       H1-corrected: {:n} \n"
-		 "       H2-corrected: {:n} ",
-		 stats[NOCHANGE], stats[NOBUCKET], stats[H1CHANGE], stats[H2CHANGE]);
-	size_t total = stats[NOCHANGE] + stats[NOBUCKET] + stats[H1CHANGE] + stats[H2CHANGE];
-	eprn(":: Corrected map size: {:n} (~ {:n} MB)", corrected_counts.size(), estimate_size(corrected_counts) / MB);
-	eprn(":: Correcting barcodes ... done in {:.1f} s", elapsed(T)); T = cur_time();
-
 /// 3. Set up bucket boundaries
 	// 3a. Create file handles and buffers
 	int de = stat_dir(output_dir);
@@ -398,6 +420,7 @@ EXTERNC void correct(
 	char bcd[BC_LEN + 1];
 	bcd[BC_LEN] = 0;
 	string b = string(BC_LEN, '#');
+	string haplotag_bc;
 
 	// ifstream cin("../../ema/data/inter.fq");
 	size_t current = 0;
@@ -409,8 +432,28 @@ EXTERNC void correct(
 		bool process = r.size() >= MIN_READ_SIZE;
 
 		uint32_t barcode;
+		
+		bool bx = false;
+		if (is_haplotag)
+		{
+			size_t bx_start = n.find_first_of(" \t");
+			if (bx_start != string::npos)
+			{
+				bx_start = n.find("BX:Z:", bx_start);
+				if (bx_start != string::npos && (bx_start + 16) < s.size())
+				{
+					haplotag_bc = n.substr (bx_start + 5, 12);
+					barcode = PackHaplotagString(haplotag_bc);
+					bx = true;
+				}
+			}
+		}
+		else bx = true;
+		
+		process = process && bx;
+
 		bool has_n = 0;
-		if (process) DO(BC_LEN) {
+		if (process && !is_haplotag) DO(BC_LEN) {
 			if (q[_] < ILLUMINA_QUAL_OFFSET) {
 				process = false;
 				eprn("Ignoring long read--- quality score {} less than {}", q, ILLUMINA_QUAL_OFFSET);
@@ -432,10 +475,13 @@ EXTERNC void correct(
 		}
 
 		int fidx;
-		auto cit = corrected_counts.find(b);
-		if (cit != corrected_counts.end()) {
-			barcode = cit->second;
-			has_n = 0;
+		if (!is_haplotag)
+		{
+			auto cit = corrected_counts.find(b);
+			if (cit != corrected_counts.end()) {
+				barcode = cit->second;
+				has_n = 0;
+			}
 		}
 		auto kit = has_n ? known_counts.end() : known_counts.find(barcode);
 		if (kit != known_counts.end()) {
@@ -451,10 +497,16 @@ EXTERNC void correct(
 		// Barcode
 		#define PRINT_BCD() \
 		if (barcode != 0) { \
-			auto bc = barcode; \
-			DO(BC_LEN) bcd[BC_LEN - _ - 1] = "ACGT"[bc & 3], bc >>= 2; \
-			memcpy(buff + buffi, bcd, BC_LEN); \
-			buffi += BC_LEN; \
+			if (is_haplotag) { \
+				memcpy(buff + buffi, haplotag_bc.c_str(), 12); \
+				buffi += 12; \
+			} \
+			else { \
+				auto bc = barcode; \
+				DO(BC_LEN) bcd[BC_LEN - _ - 1] = "ACGT"[bc & 3], bc >>= 2; \
+				memcpy(buff + buffi, bcd, BC_LEN); \
+				buffi += BC_LEN; \
+			} \
 		}
 		if (fidx && !do_bx_format) {
 			PRINT_BCD();
@@ -472,16 +524,32 @@ EXTERNC void correct(
 				memcpy(buff + buffi, "BX:Z:", 5);
 				buffi += 5;
 				PRINT_BCD();
-				memcpy(buff + buffi, "-1\n", 3);
-				buffi += 3;
+				if (is_haplotag) 
+				{
+					memcpy(buff + buffi, "\n", 1);
+					buffi += 1;
+				}
+				else
+				{
+					memcpy(buff + buffi, "-1\n", 3);
+					buffi += 3;
+				}
 			}
 		} else {
 			buff[buffi++] = '\n';
 		}
 
 		// Trimmed read
-		memcpy(buff + buffi, r.c_str() + BC_LEN + MATE1_TRIM, r.size() - BC_LEN - MATE1_TRIM);
-		buffi += r.size() - BC_LEN - MATE1_TRIM;
+		if (is_haplotag)
+		{
+			memcpy(buff + buffi, r.c_str(), r.size());
+			buffi += r.size();
+		}
+		else
+		{
+			memcpy(buff + buffi, r.c_str() + BC_LEN + MATE1_TRIM, r.size() - BC_LEN - MATE1_TRIM);
+			buffi += r.size() - BC_LEN - MATE1_TRIM;
+		}
 		if (fidx && !do_bx_format) {
 			buff[buffi++] = ' ';
 		} else {
@@ -491,8 +559,16 @@ EXTERNC void correct(
 		}
 
 		// Trimmed quality
-		memcpy(buff + buffi, q.c_str() + BC_LEN + MATE1_TRIM, q.size() - BC_LEN - MATE1_TRIM);
-		buffi += r.size() - BC_LEN - MATE1_TRIM;
+		if (is_haplotag)
+		{
+			memcpy(buff + buffi, q.c_str(), q.size());
+			buffi += r.size();
+		}
+		else
+		{
+			memcpy(buff + buffi, q.c_str() + BC_LEN + MATE1_TRIM, q.size() - BC_LEN - MATE1_TRIM);
+			buffi += r.size() - BC_LEN - MATE1_TRIM;
+		}
 		if (fidx && !do_bx_format) {
 			buff[buffi++] = ' ';
 		} else {
@@ -509,8 +585,11 @@ EXTERNC void correct(
 				memcpy(buff + buffi, " BX:Z:", 6);
 				buffi += 6;
 				PRINT_BCD();
-				memcpy(buff + buffi, "-1", 2);
-				buffi += 2;
+				if (!is_haplotag) 
+				{
+					memcpy(buff + buffi, "-1", 2);
+					buffi += 2;
+				}
 			}
 			buff[buffi++] = '\n';
 		}
