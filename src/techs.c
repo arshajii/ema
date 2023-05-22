@@ -2,7 +2,7 @@
 #include <string.h>
 #include "techs.h"
 
-static bc_t extract_bc_haptag(FASTQRecord *rec)
+static bc_t extract_bc_haplotag(FASTQRecord *rec)
 {
 	char *bc_str = strrchr(rec->id, ':');
 	assert(bc_str != NULL);
@@ -43,8 +43,8 @@ static bc_t extract_bc_cptseq(FASTQRecord *rec)
 }
 
 static PlatformProfile profiles[] = {
-	{.name = "haptag",
-	 .extract_bc = extract_bc_haptag,
+	{.name = "haplotag",
+	 .extract_bc = extract_bc_haplotag,
 	 .many_clouds = 0,
 	 .dist_thresh = 50000,
 	 .error_rate = 0.001,

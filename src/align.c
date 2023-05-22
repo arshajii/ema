@@ -252,7 +252,7 @@ void find_clouds_and_align(FILE *fq1,
 	FASTQRecord *latest_fqr2 = NULL;
 	size_t latest_n2 = 0;
 
-	const int is_haplotag = !strcmp(tech->name, "haptag");
+	const int is_haplotag = !strcmp(tech->name, "haplotag");
 	
 	if (!STANDARD_FASTQ())
 		read_special_fastq(fqx, &fq1_recs_full, &fq2_recs_full, is_haplotag);

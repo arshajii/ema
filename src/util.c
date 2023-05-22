@@ -60,7 +60,7 @@ bc_t encode_bc_default(const char *bc)
 #undef BC_ADD_BASE
 }
 
-bc_t encode_bc_haptag(const char *bc)
+bc_t encode_bc_haplotag(const char *bc)
 {
 #define CharToInt(c) ((c) - '0')
 #define TwoCharToInt(s) ((10 * CharToInt(s[0])) + CharToInt(s[1])) 
@@ -71,7 +71,7 @@ bc_t encode_bc_haptag(const char *bc)
 
 bc_t encode_bc(const char *bc, const int is_haplotag)
 {
-	if (is_haplotag) return encode_bc_haptag(bc);
+	if (is_haplotag) return encode_bc_haplotag(bc);
 	else return encode_bc_default(bc);
 }
 
@@ -83,14 +83,14 @@ void decode_bc_default(bc_t bc, char *out)
 	}
 }
 
-void decode_bc_haptag(bc_t bc, char *out)
+void decode_bc_haplotag(bc_t bc, char *out)
 {
 	sprintf(out, "A%02uC%02uB%02uD%02u", (bc >> 24) & 127, (bc >> 16) & 127, (bc >> 8) & 127, bc & 127);
 }
 
 void decode_bc(bc_t bc, char *out, const int is_haplotag)
 {
-	if (is_haplotag) decode_bc_haptag(bc, out);
+	if (is_haplotag) decode_bc_haplotag(bc, out);
 	else decode_bc_default(bc, out);
 }
 

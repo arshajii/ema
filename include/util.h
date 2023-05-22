@@ -25,10 +25,10 @@ void copy_until_space(char *dest, char **src);
 char *escape(char *s);
 
 bc_t encode_bc_default(const char *bc);
-bc_t encode_bc_haptag(const char *bc);
+bc_t encode_bc_haplotag(const char *bc);
 bc_t encode_bc(const char *bc, const int is_haplotag);
 void decode_bc_default(bc_t bc, char *out);
-void decode_bc_haptag(bc_t bc, char *out);
+void decode_bc_haplotag(bc_t bc, char *out);
 void decode_bc(bc_t bc, char *out, const int is_haplotag);
 size_t count_lines(FILE *f);
 size_t trim_after_space(char *s);
