@@ -106,7 +106,7 @@ static void print_help_and_exit(const char *argv0, int error)
 	P("  -R <RG string>: full read group string (e.g. '@RG\\tID:foo\\tSM:bar') [none]\n");
 	P("  -d: apply fragment read density optimization [off]\n");
 	P("  -p <platform>: sequencing platform (one of 'haptag', '10x', 'tru', 'cpt') [10x]\n");
-	P("  -i <index>: index to follow 'BX' tag in SAM output [1]");
+	P("  -i <index>: index to follow 'BX' tag in SAM output [1]\n");
 	P("  -t <threads>: set number of threads [1]\n");
 	P("  all other arguments (only for -x): list of all preprocessed inputs\n");
 	P("\n");
