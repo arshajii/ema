@@ -34,7 +34,6 @@ jobs:
             tar -czf "$PT_RELEASE_FILE" "$PT_RELEASE_NAME"
             echo "Created source archive $PT_RELEASE_FILE with content: $(ls -a "$PT_RELEASE_NAME")"
       - name: Upload source distribution
-        if: ${{ github.event_name == 'release' }}
         uses: softprops/action-gh-release@v1
         with:
           files: ${{env.PT_RELEASE_FILE}}
