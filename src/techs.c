@@ -28,6 +28,32 @@ static bc_t extract_bc_10x(FASTQRecord *rec)
 	return encode_bc(&bc_str[1], 0);
 }
 
+
+static bc_t extract_bc_tellseq(FASTQRecord *rec)
+{
+	// Get text after whitespace	  
+	char *space = strchr(rec->id, ' ');
+	if (space != NULL) {
+		// If startswith BX:Z: is in longranger basic format
+		if (strncmp(" BX:Z:", space, 6) == 0) {
+			char *bc_str = strrchr(space, ':');
+			*space = '\0';
+			assert(bc_str != NULL);
+			*bc_str = '\0';
+			return encode_bc(&bc_str[1], 0);
+		}
+
+		// If not, remove text
+		*space = '\0';
+	} 
+	
+	// Take string after final ':' as barcode
+	char *bc_str = strrchr(rec->id, ':');
+	assert(bc_str != NULL);
+	*bc_str = '\0';
+	return encode_bc(&bc_str[1], 0);
+}
+
 static bc_t extract_bc_truseq(FASTQRecord *rec)
 {
 	char *bc_str = rec->id[0] == '@' ? &(rec->id)[1] : rec->id;
@@ -45,6 +71,7 @@ static bc_t extract_bc_cptseq(FASTQRecord *rec)
 static PlatformProfile profiles[] = {
 	{.name = "haplotag",
 	 .extract_bc = extract_bc_haplotag,
+	 .bc_len = 12,
 	 .many_clouds = 0,
 	 .dist_thresh = 50000,
 	 .error_rate = 0.001,
@@ -81,6 +108,15 @@ static PlatformProfile profiles[] = {
 	{.name = "dbs",
 	 .extract_bc = extract_bc_10x,
 	 .bc_len = 20,
+	 .many_clouds = 0,
+	 .dist_thresh = 50000,
+	 .error_rate = 0.001,
+	 .n_density_probs = 4,
+	 .density_probs = {0.6, 0.05, 0.2, 0.01}},
+	
+	{.name = "tellseq",
+	 .extract_bc = extract_bc_tellseq,
+	 .bc_len = 18,
 	 .many_clouds = 0,
 	 .dist_thresh = 50000,
 	 .error_rate = 0.001,

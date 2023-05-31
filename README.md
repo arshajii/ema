@@ -55,7 +55,7 @@ align: choose best alignments based on barcodes
   -o <SAM file>: output SAM file [stdout]
   -R <RG string>: full read group string (e.g. '@RG\tID:foo\tSM:bar') [none]
   -d: apply fragment read density optimization [off]
-  -p <platform>: sequencing platform (one of '10x', 'tru', 'cpt', 'haplotag', 'dbs') [10x]
+  -p <platform>: sequencing platform (one of '10x', 'tru', 'cpt', 'haplotag', 'dbs', 'tellseq') [10x]
   -i <index>: index to follow 'BX' tag in SAM output [1]
   -t <threads>: set number of threads [1]
   all other arguments (only for -x): list of all preprocessed inputs
@@ -157,8 +157,36 @@ sambamba merge -t 40 -p ema_final.bam output_dir/*.bam
 Now you should have a single, sorted, duplicate-marked BAM `ema_final.bam`.
 
 ### Other sequencing platforms
+EMA can also be run using data from other linked-read or sequencing platforms than 10x Genomics. Other platforms are selected using the flag `-p <platfrom>`. Available platforms and their flags specifications are:
 
-**DBS**
+- [TELL-seq](#tell-seq): `tellseq`
+- [Droplet Barcode Sequencing (DBS)](#dbs): `dbs`
+- [CPT-seq](#cpt-seqtruseq-slr): `cpt`
+- [TruSeq Synthetic Long Reads (SLR)](#cpt-seqtruseq-slr): `tru`
+
+#### TELL-Seq
+
+The TELL-seq linked-read platform is commercially available from [Universal Sequencing](https://www.universalsequencing.com/) and was presented in [Chen et al. 2020 GenomeRes](https://doi.org/10.1101/gr.260380.119). The platform uses a 18 bp semi-degenerate barcode. The FASTQs can for example be preprocess using the Universal Sequencing TELL-Read pipeline to generate barcodes tagged FASTQs as below where the barcode is added after the read name as below 
+
+```
+@A00741:47:HCM53DRXX:1:1101:18159:7326:TTATTTAATCTTAGTCGT 1:N:0:1
+TTATTTAATCTTAGTCGTCCTGGCTAATTTTTTTGTATTTTTATTAGATACGGGATTTCTCCATGTTGGCTTGGCGGGTCTCAAACTCTTGACCTTAGGTGATCTGCCTGCCTCAGCCTCCCAAAGTGCTGGGATTACCGGCGTGAGCCACCGCACCCAGCCTA
++
+,FFFFFFFFF:FFF::FF,FFFFFFFFFF,FFF:F,F::,FFFF,F,F,FF,,FFFFFFFFFF,,FF:F:FF,F:F,,FFFFFFFF:FFFFFFFF:F,:FFFFFF:FFF:FF,FFFFFFFFFFFF:,::F,FFFF:FFFF,FF,FFFFFF:,,FFFFFFFFFFF
+```
+
+Note that these FASTQs need to be sorted by barcode before using `ema align`.
+
+EMA also supports TELL-seq data provided in the `longranger basic` format, e.g. BX tagged FASTQs as below
+
+```
+@A00741:47:HCM53DRXX:1:1101:18159:7326 BX:Z:TTATTTAATCTTAGTCGT
+TTATTTAATCTTAGTCGTCCTGGCTAATTTTTTTGTATTTTTATTAGATACGGGATTTCTCCATGTTGGCTTGGCGGGTCTCAAACTCTTGACCTTAGGTGATCTGCCTGCCTCAGCCTCCCAAAGTGCTGGGATTACCGGCGTGAGCCACCGCACCCAGCCTA
++
+,FFFFFFFFF:FFF::FF,FFFFFFFFFF,FFF:F,F::,FFFF,F,F,FF,,FFFFFFFFFF,,FF:F:FF,F:F,,FFFFFFFF:FFFFFFFF:F,:FFFFFF:FFF:FF,FFFFFFFFFFFF:,::F,FFFF:FFFF,FF,FFFFFF:,,FFFFFFFFFFF
+```
+
+#### DBS
 
 EMA can run using linked reads generated using the method presented in [Redin et al. 2019 SciRep](https://doi.org/10.1038/s41598-019-54446-x), commonly referred to as Droplet Barcode Sequencing (DBS). For running `ema align` with DBS linked-read the FASTQs must have the 20 base barcode present in the read header, similar to output from `longranger basic`. Here is an example FASTQ entry with the barcode `CTTGGTCATTCATACAGTCC`. 
 
@@ -169,9 +197,7 @@ CAGTGGGAGCCCTGACCTTGTTTTTCTGTAAGTAGACGGTCCATCTAGGGGTGATGGGAGAAAGTGACAGATCATCAGGC
 F,FF,FFFFFFFFFFFFFFFFFFFFFFFFFFFF,FFFFFFFFF:FFFFFFFFFF:FFFFF,FFFFFFFFFFFFFFFF:FF::FFF,FFFFFFF,FFFFFFFFFF,FFFFFF:FFFFFFFFFFFFFFFFFFFFFFFF:FFF:F:FFFFFFFF
 ```
 
-The `-p dbs` flag must be set for DBS linked reads.
-
-**CPT-seq/TruSeq SLR**
+#### CPT-seq/TruSeq SLR
 
 Instructions for preprocessing and running EMA on data from CPT-seq and TruSeq Synthetic Long Reads can be found [here](https://github.com/arshajii/ema-paper-data/blob/master/experiments.ipynb).
 
