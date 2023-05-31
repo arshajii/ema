@@ -53,6 +53,7 @@ static PlatformProfile profiles[] = {
 	
 	{.name = "10x",
 	 .extract_bc = extract_bc_10x,
+	 .bc_len = 16,
 	 .many_clouds = 0,
 	 .dist_thresh = 50000,
 	 .error_rate = 0.001,
@@ -61,6 +62,7 @@ static PlatformProfile profiles[] = {
 
 	{.name = "tru",
 	 .extract_bc = extract_bc_truseq,
+	 .bc_len = 0,
 	 .many_clouds = 1,
 	 .dist_thresh = 15000,
 	 .error_rate = 0.001,
@@ -69,12 +71,22 @@ static PlatformProfile profiles[] = {
 
 	{.name = "cpt",
 	 .extract_bc = extract_bc_cptseq,
+	 .bc_len = 0,
 	 .many_clouds = 1,
 	 .dist_thresh = 3500,
 	 .error_rate = 0.01,
 	 .n_density_probs = 9,
 	 .density_probs = {0.6, 0.01, 0.15, 0.001, 0.05, 0.001, 0.02, 0.001, 0.01}},
 
+	{.name = "dbs",
+	 .extract_bc = extract_bc_10x,
+	 .bc_len = 20,
+	 .many_clouds = 0,
+	 .dist_thresh = 50000,
+	 .error_rate = 0.001,
+	 .n_density_probs = 4,
+	 .density_probs = {0.6, 0.05, 0.2, 0.01}},
+	
 	{.name = NULL},
 };
 

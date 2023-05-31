@@ -55,7 +55,7 @@ align: choose best alignments based on barcodes
   -o <SAM file>: output SAM file [stdout]
   -R <RG string>: full read group string (e.g. '@RG\tID:foo\tSM:bar') [none]
   -d: apply fragment read density optimization [off]
-  -p <platform>: sequencing platform (one of '10x', 'tru', 'cpt', 'haplotag') [10x]
+  -p <platform>: sequencing platform (one of '10x', 'tru', 'cpt', 'haplotag', 'dbs') [10x]
   -i <index>: index to follow 'BX' tag in SAM output [1]
   -t <threads>: set number of threads [1]
   all other arguments (only for -x): list of all preprocessed inputs
@@ -157,7 +157,23 @@ sambamba merge -t 40 -p ema_final.bam output_dir/*.bam
 Now you should have a single, sorted, duplicate-marked BAM `ema_final.bam`.
 
 ### Other sequencing platforms
-Instructions for preprocessing and running EMA on data from other sequencing platforms can be found [here](https://github.com/arshajii/ema-paper-data/blob/master/experiments.ipynb).
+
+**DBS**
+
+EMA can run using linked reads generated using the method presented in [Redin et al. 2019 SciRep](https://doi.org/10.1038/s41598-019-54446-x), commonly referred to as Droplet Barcode Sequencing (DBS). For running `ema align` with DBS linked-read the FASTQs must have the 20 base barcode present in the read header, similar to output from `longranger basic`. Here is an example FASTQ entry with the barcode `CTTGGTCATTCATACAGTCC`. 
+
+```
+@A00621:130:HN5HWDSXX:4:1103:8639:28573 BX:Z:CTTGGTCATTCATACAGTCC
+CAGTGGGAGCCCTGACCTTGTTTTTCTGTAAGTAGACGGTCCATCTAGGGGTGATGGGAGAAAGTGACAGATCATCAGGCATTGGATTCTCCTAAGGAGGGTGCAATGTAGATCCCTCGCGTGCAGAACTCAATGTAGGGTTCATGCTCCC
++
+F,FF,FFFFFFFFFFFFFFFFFFFFFFFFFFFF,FFFFFFFFF:FFFFFFFFFF:FFFFF,FFFFFFFFFFFFFFFF:FF::FFF,FFFFFFF,FFFFFFFFFF,FFFFFF:FFFFFFFFFFFFFFFFFFFFFFFF:FFF:F:FFFFFFFF
+```
+
+The `-p dbs` flag must be set for DBS linked reads.
+
+**CPT-seq/TruSeq SLR**
+
+Instructions for preprocessing and running EMA on data from CPT-seq and TruSeq Synthetic Long Reads can be found [here](https://github.com/arshajii/ema-paper-data/blob/master/experiments.ipynb).
 
 ### Output
 EMA outputs a standard SAM file with several additional tags:
