@@ -165,9 +165,11 @@ EMA can also be run using data from other linked-read or sequencing platforms th
 - [CPT-seq](#cpt-seqtruseq-slr): `cpt`
 - [TruSeq Synthetic Long Reads (SLR)](#cpt-seqtruseq-slr): `tru`
 
+For preprocessing with subcommands `count` and `preproc`, only 10x Genomics and Haplotagging reads are enabled a the moment.
+
 #### Haplotagging
 
-The haplotagging method for generating long reads was presented in [Meier et al. 2021](https://doi.org/10.1073/pnas.2015005118). The platform uses a 16 bp barcode. The `ema` subcommands `count` and `preproc` for preprocessing is also enable for haplotagging reads. 
+The haplotagging method for generating long reads was presented in [Meier et al. 2021 PNAS](https://doi.org/10.1073/pnas.2015005118). The platform uses a 16 bp barcode. See the [Haplotagging note](#haplotagging-note) above for more information about using these reads.
 
 #### TELL-Seq
 
