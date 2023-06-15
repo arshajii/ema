@@ -235,9 +235,10 @@ void print_sam_record(SAMRecord *rec,
 	}
 
 	// tags
+	char bc_str[BC_LEN + 1];
+	memset( bc_str, 0, (BC_LEN + 1)*sizeof(char) );
 	if (is_haplotag)
 	{
-		char bc_str[13] = {0};
 		decode_bc(bc, bc_str, 1);
 		if (rec != NULL) {
 			fprintf(out, "\tNM:i:%d\tBX:Z:%s\tXG:f:%.5g\tMI:i:%d\tXF:i:%d", r->edit_dist, bc_str, gamma, cloud->id, cloud->bad);
@@ -246,8 +247,7 @@ void print_sam_record(SAMRecord *rec,
 		}
 	}
 	else
-	{
-		char bc_str[BC_LEN + 1] = {0};
+	{		
 		decode_bc(bc, bc_str, 0);
 		if (rec != NULL) {
 			fprintf(out, "\tNM:i:%d\tBX:Z:%s-%s\tXG:f:%.5g\tMI:i:%d\tXF:i:%d", r->edit_dist, bc_str, bx_index, gamma, cloud->id, cloud->bad);
