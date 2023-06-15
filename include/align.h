@@ -57,9 +57,7 @@ int is_pair_relaxed(struct sam_record *r1, struct sam_record *r2);
 
 /* lengths */
 extern int BC_LEN;
-extern int MATE1_TRIM;
 
-#define MIN_READ_LEN (BC_LEN + MATE1_TRIM + 1)
 #define MAX_READ_LEN 200
 #define MAX_ID_LEN   100
 
