@@ -159,10 +159,15 @@ Now you should have a single, sorted, duplicate-marked BAM `ema_final.bam`.
 ### Other sequencing platforms
 EMA can also be run using data from other linked-read or sequencing platforms than 10x Genomics. Other platforms are selected using the flag `-p <platfrom>`. Available platforms and their flags specifications are:
 
+- [Haplotagging](#haplotagging): `haplotag`
 - [TELL-seq](#tell-seq): `tellseq`
 - [Droplet Barcode Sequencing (DBS)](#dbs): `dbs`
 - [CPT-seq](#cpt-seqtruseq-slr): `cpt`
 - [TruSeq Synthetic Long Reads (SLR)](#cpt-seqtruseq-slr): `tru`
+
+#### Haplotagging
+
+The haplotagging method for generating long reads was presented in [Meier et al. 2021](https://doi.org/10.1073/pnas.2015005118). The platform uses a 16 bp barcode. The `ema` subcommands `count` and `preproc` for preprocessing is also enable for haplotagging reads. 
 
 #### TELL-Seq
 
