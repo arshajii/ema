@@ -235,8 +235,8 @@ void print_sam_record(SAMRecord *rec,
 	}
 
 	// tags
-	char bc_str[BC_LEN + 1];
-	memset( bc_str, 0, (BC_LEN + 1)*sizeof(char) );
+	char *bc_str = safe_calloc(BC_LEN + 1, sizeof *bc_str);
+    memset(bc_str, 0, BC_LEN + 1);
 	if (is_haplotag)
 	{
 		decode_bc(bc, bc_str, 1);
