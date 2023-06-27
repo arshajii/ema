@@ -12,6 +12,7 @@ typedef struct {
 
 	bc_extract_routine_t extract_bc;
 	int many_clouds;
+	uint32_t bc_len;
 	uint32_t dist_thresh;
 	double error_rate;
 
