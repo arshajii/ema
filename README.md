@@ -63,10 +63,8 @@ align: choose best alignments based on barcodes
 help: print this help message
 ```
 
-#### Haplotagging note
-If using haplotagging data, where barcodes are coded in the read headers as `BX:Z:AxxCxxBxxDxx`, you *do not* need to provide
-a barcode whitelist for the `count` or `proproc` steps.
-
+See the [Other Sequencing Platforms](#other-sequencing-platforms) below for more information 
+about the implementation details of different linked-read sequencing technologies.
 
 ### Input formats
 EMA has several input modes:
@@ -169,7 +167,8 @@ For preprocessing with subcommands `count` and `preproc`, only 10x Genomics and 
 
 #### Haplotagging
 
-The haplotagging method for generating long reads was presented in [Meier et al. 2021 PNAS](https://doi.org/10.1073/pnas.2015005118). The platform uses a 16 bp barcode. See the [Haplotagging note](#haplotagging-note) above for more information about using these reads.
+The haplotagging method for generating long reads was presented in [Meier et al. 2021 PNAS](https://doi.org/10.1073/pnas.2015005118). The platform uses a 16 bp barcode. If using haplotagging data, where barcodes are coded in the read headers as `BX:Z:AxxCxxBxxDxx`, you *do not* need to provide
+a barcode whitelist for the `count` or `proproc` steps.
 
 #### TELL-Seq
 
